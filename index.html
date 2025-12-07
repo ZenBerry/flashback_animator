@@ -336,6 +336,8 @@
       <div id="editor-tabs" style="display: none; background: #eee; border-bottom: 1px solid #ddd; padding: 0 5px;">
         <button id="tab-code" class="active"
           style="border: none; background: #fff; padding: 5px 10px; font-size: 11px; cursor: pointer; border-radius: 4px 4px 0 0; margin-top: 4px; border: 1px solid #ddd; border-bottom: none;">Code</button>
+        <button id="tab-tinker"
+          style="border: none; background: transparent; padding: 5px 10px; font-size: 11px; cursor: pointer; margin-top: 4px;">Tinker</button>
         <button id="tab-talk"
           style="border: none; background: transparent; padding: 5px 10px; font-size: 11px; cursor: pointer; margin-top: 4px;">Talk</button>
       </div>
@@ -345,6 +347,68 @@
         <div id="tab-content-code" style="display: flex; flex-direction: column; flex: 1; height: 100%;">
           <textarea id="code-editor-textarea" style="flex: 1;"
             placeholder="// Enter JavaScript code here&#10;// Available functions: play(), stop(), goto(frame), gotoAndStop(frame), beep(note), playSound(url)"></textarea>
+        </div>
+
+        <!-- Tinker Tab Content -->
+        <div id="tab-content-tinker"
+          style="display: none; flex-direction: column; flex: 1; height: 100%; overflow-y: auto; padding: 10px; gap: 10px;">
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label style="font-size: 11px; font-weight: bold;">Fill & Stroke</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <label style="font-size: 10px;">Fill:</label>
+              <input type="color" id="tinker-fill" style="width: 30px; height: 20px; border: none; padding: 0;">
+              <label style="font-size: 10px;">Stroke:</label>
+              <input type="color" id="tinker-stroke" style="width: 30px; height: 20px; border: none; padding: 0;">
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label style="font-size: 11px; font-weight: bold;">Transform</label>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label style="font-size: 10px;">Rotation</label>
+              <input type="range" id="tinker-rotation" min="0" max="360" step="1" value="0"
+                style="flex: 1; margin: 0 10px;">
+              <span id="tinker-rotation-val" style="font-size: 10px; width: 25px;">0</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label style="font-size: 10px;">Scale</label>
+              <input type="range" id="tinker-scale" min="0.1" max="5" step="0.1" value="1"
+                style="flex: 1; margin: 0 10px;">
+              <span id="tinker-scale-val" style="font-size: 10px; width: 25px;">1</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label style="font-size: 10px;">Opacity</label>
+              <input type="range" id="tinker-opacity" min="0" max="1" step="0.1" value="1"
+                style="flex: 1; margin: 0 10px;">
+              <span id="tinker-opacity-val" style="font-size: 10px; width: 25px;">1</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label style="font-size: 11px; font-weight: bold;">Dimensions</label>
+            <div style="display: flex; gap: 5px;">
+              <div style="flex: 1;">
+                <label style="font-size: 10px; display: block;">Width</label>
+                <input type="number" id="tinker-width" style="width: 100%; font-size: 10px;">
+              </div>
+              <div style="flex: 1;">
+                <label style="font-size: 10px; display: block;">Height</label>
+                <input type="number" id="tinker-height" style="width: 100%; font-size: 10px;">
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label style="font-size: 11px; font-weight: bold;">Properties</label>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label style="font-size: 10px;">Stroke Width</label>
+              <input type="number" id="tinker-stroke-width" min="0" step="1" style="width: 40px; font-size: 10px;">
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label style="font-size: 10px;">Corner Radius</label>
+              <input type="number" id="tinker-radius" min="0" step="1" style="width: 40px; font-size: 10px;">
+            </div>
+          </div>
         </div>
 
         <!-- Talk Tab Content -->
@@ -2839,47 +2903,62 @@
 
         // Tab Buttons
         const tabCode = document.getElementById( 'tab-code' );
+        const tabTinker = document.getElementById( 'tab-tinker' );
         const tabTalk = document.getElementById( 'tab-talk' );
         const contentCode = document.getElementById( 'tab-content-code' );
+        const contentTinker = document.getElementById( 'tab-content-tinker' );
         const contentTalk = document.getElementById( 'tab-content-talk' );
 
         const switchTab = ( tab ) => {
+          // Reset all tabs
+          [ tabCode, tabTinker, tabTalk ].forEach( t => {
+            t.className = '';
+            t.style.background = 'transparent';
+            t.style.border = 'none';
+          } );
+
+          // Hide all content
+          contentCode.style.display = 'none';
+          contentTinker.style.display = 'none';
+          contentTalk.style.display = 'none';
+
+          // Activate selected tab
           if ( tab === 'code' ) {
             tabCode.className = 'active';
             tabCode.style.background = '#fff';
+            tabCode.style.border = '1px solid #ddd';
             tabCode.style.borderBottom = 'none';
-
-            tabTalk.className = '';
-            tabTalk.style.background = 'transparent';
-            tabTalk.style.borderBottom = '1px solid #ddd';
-
             contentCode.style.display = 'flex';
-            contentTalk.style.display = 'none';
-
             saveBtn.style.display = 'inline-block';
             askBtn.style.display = 'none';
-          } else {
+          } else if ( tab === 'tinker' ) {
+            tabTinker.className = 'active';
+            tabTinker.style.background = '#fff';
+            tabTinker.style.border = '1px solid #ddd';
+            tabTinker.style.borderBottom = 'none';
+            contentTinker.style.display = 'flex';
+            saveBtn.style.display = 'none';
+            askBtn.style.display = 'none';
+            // Populate tinker controls with current element values
+            if ( isEditingSVG ) populateTinkerControls();
+          } else if ( tab === 'talk' ) {
             tabTalk.className = 'active';
             tabTalk.style.background = '#fff';
             tabTalk.style.border = '1px solid #ddd';
             tabTalk.style.borderBottom = 'none';
-
-            tabCode.className = '';
-            tabCode.style.background = 'transparent';
-            tabCode.style.border = 'none';
-
-            contentCode.style.display = 'none';
             contentTalk.style.display = 'flex';
-
             saveBtn.style.display = 'none';
             askBtn.style.display = 'inline-block';
-
             document.getElementById( 'talk-textarea' ).focus();
           }
         };
 
         tabCode.onclick = () => switchTab( 'code' );
+        tabTinker.onclick = () => switchTab( 'tinker' );
         tabTalk.onclick = () => switchTab( 'talk' );
+
+        // Tinker Controls Event Listeners
+        setupTinkerControls();
 
         // Ask Button Logic
         askBtn.onclick = async () => {
@@ -2956,6 +3035,207 @@
           }, 100 );
         } );
       }
+
+      // --- Tinker Controls Setup ---
+      function setupTinkerControls() {
+        const rotationSlider = document.getElementById( 'tinker-rotation' );
+        const rotationVal = document.getElementById( 'tinker-rotation-val' );
+        const scaleSlider = document.getElementById( 'tinker-scale' );
+        const scaleVal = document.getElementById( 'tinker-scale-val' );
+        const opacitySlider = document.getElementById( 'tinker-opacity' );
+        const opacityVal = document.getElementById( 'tinker-opacity-val' );
+        const widthInput = document.getElementById( 'tinker-width' );
+        const heightInput = document.getElementById( 'tinker-height' );
+        const fillInput = document.getElementById( 'tinker-fill' );
+        const strokeInput = document.getElementById( 'tinker-stroke' );
+        const strokeWidthInput = document.getElementById( 'tinker-stroke-width' );
+        const radiusInput = document.getElementById( 'tinker-radius' );
+
+        // Update value displays
+        rotationSlider.oninput = () => {
+          rotationVal.textContent = rotationSlider.value;
+          applyTinkerChanges();
+        };
+
+        scaleSlider.oninput = () => {
+          scaleVal.textContent = scaleSlider.value;
+          applyTinkerChanges();
+        };
+
+        opacitySlider.oninput = () => {
+          opacityVal.textContent = opacitySlider.value;
+          applyTinkerChanges();
+        };
+
+        // All other inputs
+        widthInput.oninput = applyTinkerChanges;
+        heightInput.oninput = applyTinkerChanges;
+        fillInput.oninput = applyTinkerChanges;
+        strokeInput.oninput = applyTinkerChanges;
+        strokeWidthInput.oninput = applyTinkerChanges;
+        radiusInput.oninput = applyTinkerChanges;
+      }
+
+      function populateTinkerControls() {
+        if ( !currentEditingElementId ) return;
+
+        const element = document.querySelector( `[data-id="${ currentEditingElementId }"]` );
+        if ( !element ) return;
+
+        // Get current transform values
+        const transform = element.getAttribute( 'transform' ) || '';
+        let rotation = 0;
+        let scale = 1;
+
+        const rotateMatch = transform.match( /rotate\(([^)]+)\)/ );
+        if ( rotateMatch ) {
+          const parts = rotateMatch[ 1 ].split( /[\s,]+/ );
+          rotation = parseFloat( parts[ 0 ] ) || 0;
+        }
+
+        const scaleMatch = transform.match( /scale\(([^)]+)\)/ );
+        if ( scaleMatch ) {
+          scale = parseFloat( scaleMatch[ 1 ] ) || 1;
+        }
+
+        // Set controls
+        document.getElementById( 'tinker-rotation' ).value = rotation;
+        document.getElementById( 'tinker-rotation-val' ).textContent = rotation;
+        document.getElementById( 'tinker-scale' ).value = scale;
+        document.getElementById( 'tinker-scale-val' ).textContent = scale;
+
+        const opacity = element.getAttribute( 'opacity' ) || '1';
+        document.getElementById( 'tinker-opacity' ).value = opacity;
+        document.getElementById( 'tinker-opacity-val' ).textContent = opacity;
+
+        // Dimensions
+        const width = element.getAttribute( 'width' ) || element.getAttribute( 'rx' ) || '';
+        const height = element.getAttribute( 'height' ) || element.getAttribute( 'ry' ) || '';
+        document.getElementById( 'tinker-width' ).value = width;
+        document.getElementById( 'tinker-height' ).value = height;
+
+        // Colors
+        const fill = element.getAttribute( 'fill' ) || '#000000';
+        const stroke = element.getAttribute( 'stroke' ) || '#000000';
+        document.getElementById( 'tinker-fill' ).value = fill;
+        document.getElementById( 'tinker-stroke' ).value = stroke;
+
+        // Stroke width
+        const strokeWidth = element.getAttribute( 'stroke-width' ) || '';
+        document.getElementById( 'tinker-stroke-width' ).value = strokeWidth;
+
+        // Corner radius (for rect)
+        const rx = element.getAttribute( 'rx' ) || '';
+        document.getElementById( 'tinker-radius' ).value = rx;
+      }
+
+      function applyTinkerChanges() {
+        if ( !currentEditingElementId ) return;
+
+        const element = document.querySelector( `[data-id="${ currentEditingElementId }"]` );
+        if ( !element ) return;
+
+        // Get values
+        const rotation = document.getElementById( 'tinker-rotation' ).value;
+        const scale = document.getElementById( 'tinker-scale' ).value;
+        const opacity = document.getElementById( 'tinker-opacity' ).value;
+        const width = document.getElementById( 'tinker-width' ).value;
+        const height = document.getElementById( 'tinker-height' ).value;
+        const fill = document.getElementById( 'tinker-fill' ).value;
+        const stroke = document.getElementById( 'tinker-stroke' ).value;
+        const strokeWidth = document.getElementById( 'tinker-stroke-width' ).value;
+        const radius = document.getElementById( 'tinker-radius' ).value;
+
+        // Apply transform
+        let transforms = [];
+        if ( rotation && rotation != 0 ) {
+          // Get element center for rotation
+          const bbox = element.getBBox();
+          const cx = bbox.x + bbox.width / 2;
+          const cy = bbox.y + bbox.height / 2;
+          transforms.push( `rotate(${ rotation } ${ cx } ${ cy })` );
+        }
+        if ( scale && scale != 1 ) {
+          const bbox = element.getBBox();
+          const cx = bbox.x + bbox.width / 2;
+          const cy = bbox.y + bbox.height / 2;
+          transforms.push( `translate(${ cx } ${ cy }) scale(${ scale }) translate(${ -cx } ${ -cy })` );
+        }
+
+        if ( transforms.length > 0 ) {
+          element.setAttribute( 'transform', transforms.join( ' ' ) );
+        } else {
+          element.removeAttribute( 'transform' );
+        }
+
+        // Apply other attributes
+        if ( opacity ) element.setAttribute( 'opacity', opacity );
+        if ( width ) {
+          if ( element.tagName === 'rect' ) {
+            element.setAttribute( 'width', width );
+          } else if ( element.tagName === 'ellipse' || element.tagName === 'circle' ) {
+            element.setAttribute( 'rx', width );
+          }
+        }
+        if ( height ) {
+          if ( element.tagName === 'rect' ) {
+            element.setAttribute( 'height', height );
+          } else if ( element.tagName === 'ellipse' ) {
+            element.setAttribute( 'ry', height );
+          } else if ( element.tagName === 'circle' ) {
+            element.setAttribute( 'r', height );
+          }
+        }
+        if ( fill ) element.setAttribute( 'fill', fill );
+        if ( stroke ) element.setAttribute( 'stroke', stroke );
+        if ( strokeWidth ) element.setAttribute( 'stroke-width', strokeWidth );
+        if ( radius && element.tagName === 'rect' ) {
+          element.setAttribute( 'rx', radius );
+          element.setAttribute( 'ry', radius );
+        }
+
+        // Update the code textarea to reflect changes
+        document.getElementById( 'code-editor-textarea' ).value = element.outerHTML;
+
+        // Save changes to the frame data
+        saveTinkerChanges();
+      }
+
+      function saveTinkerChanges() {
+        if ( !currentEditingElementId ) return;
+
+        const element = document.querySelector( `[data-id="${ currentEditingElementId }"]` );
+        if ( !element ) return;
+
+        // Find the element in the current frame and update it
+        const layer = State.layers[ State.activeLayerIndex ];
+        let keyframeIndex = -1;
+
+        for ( let f = State.currentFrame; f >= 1; f-- ) {
+          if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+            keyframeIndex = f;
+            break;
+          }
+        }
+
+        if ( keyframeIndex !== -1 ) {
+          const frame = layer.frames[ keyframeIndex ];
+          const elData = frame.elements.find( el => el.id === currentEditingElementId );
+
+          if ( elData ) {
+            // Update all attributes from the DOM element
+            const attrs = {};
+            for ( let i = 0; i < element.attributes.length; i++ ) {
+              const attr = element.attributes[ i ];
+              if ( attr.name !== 'data-id' ) {
+                attrs[ attr.name ] = attr.value;
+              }
+            }
+            elData.attrs = attrs;
+          }
+        }
+      }
+
 
       async function callGemmaForElement( userPrompt, currentSvgCode ) {
         // 1. Construct Prompt
@@ -3085,10 +3365,13 @@
         const win = document.getElementById( 'code-editor-window' );
         win.querySelector( '.window-header' ).textContent = 'SVG Editor';
 
-        // Show Tabs
+        // Show Tabs (including Tinker for SVG)
         document.getElementById( 'editor-tabs' ).style.display = 'flex';
+        document.getElementById( 'tab-tinker' ).style.display = 'inline-block';
         // Reset to Code tab
         document.getElementById( 'tab-code' ).click();
+        // Populate tinker controls
+        populateTinkerControls();
 
         // Set SVG-specific helper text and placeholder
         document.getElementById( 'talk-helper-text' ).textContent = 'Describe how you want to modify this element.';
@@ -3115,6 +3398,7 @@
         currentCodeFrame = frame;
         currentCodeLayerIndex = layerIndex;
         isEditingCode = true;
+        isEditingSVG = false;
 
         const editorWindow = document.getElementById( 'code-editor-window' );
         const textarea = document.getElementById( 'code-editor-textarea' );
@@ -3123,8 +3407,9 @@
         // Update header
         header.textContent = `Frame ${ frame } Code (Layer ${ State.layers[ layerIndex ].name })`;
 
-        // Show Tabs (for frame code too)
+        // Show Tabs (but hide Tinker for frame code)
         document.getElementById( 'editor-tabs' ).style.display = 'flex';
+        document.getElementById( 'tab-tinker' ).style.display = 'none';
         // Reset to Code tab
         document.getElementById( 'tab-code' ).click();
 
