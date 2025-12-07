@@ -1,0 +1,3162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashback</title>
+    <style>
+      /* Reset & Base */
+      * {
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 12px;
+        background: #e0e0e0;
+        color: #333;
+      }
+
+      /* Layout */
+      #app {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Stage Area */
+      #stage-container {
+        width: 100%;
+        height: 100%;
+        background: #f5f5f5;
+        overflow: hidden;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 0;
+      }
+
+      #stage-content {
+        transform-origin: 0 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      /* Windows */
+      .window {
+        position: absolute;
+        background: #fff;
+        border: 1px solid #ccc;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        z-index: 100;
+      }
+
+      .window-header {
+        height: 24px;
+        background: #eee;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        align-items: center;
+        padding-left: 8px;
+        cursor: grab;
+        font-weight: bold;
+        color: #555;
+        border-radius: 4px 4px 0 0;
+      }
+
+      .window-header:active {
+        cursor: grabbing;
+      }
+
+      .window-body {
+        padding: 5px;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+
+      /* Toolbar Window */
+      #toolbar-window {
+        top: 20px;
+        left: 20px;
+        width: auto;
+        min-width: 60px;
+      }
+
+      #toolbar-body {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        padding: 5px;
+      }
+
+      .tool-btn {
+        height: 30px;
+        border: 1px solid #ddd;
+        background: #f9f9f9;
+        color: #555;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        border-radius: 2px;
+        padding: 0 10px;
+        font-size: 11px;
+      }
+
+      .tool-btn.active {
+        background: #ddd;
+        color: #000;
+        border-color: #bbb;
+      }
+
+      .tool-btn:hover {
+        background: #eee;
+      }
+
+      /* Timeline Window */
+      #timeline-window {
+        bottom: 20px;
+        left: 20px;
+        width: calc(100% - 40px);
+        height: 200px;
+      }
+
+      #timeline-controls {
+        background: #eeeeee;
+        border-bottom: 1px solid #eee;
+        padding: 5px;
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+
+      #timeline-controls button {
+        height: 24px;
+        border: 1px solid #ddd;
+        background: #f9f9f9;
+        color: #555;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        border-radius: 2px;
+        padding: 0 10px;
+        font-size: 11px;
+      }
+
+      #timeline-controls button.active {
+        background: #ddd;
+        color: #000;
+        border-color: #bbb;
+      }
+
+      #timeline-controls button:hover {
+        background: #eee;
+      }
+
+      #timeline-body {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+        position: relative;
+      }
+
+      #layer-headers {
+        width: 150px;
+        background: #f9f9f9;
+        border-right: 1px solid #eee;
+        flex-shrink: 0;
+      }
+
+      .layer-header {
+        height: 20px;
+        border-bottom: 1px solid #eee;
+        padding-left: 5px;
+        display: flex;
+        align-items: center;
+        color: #333;
+      }
+
+      #timeline-grid-container {
+        flex: 1;
+        position: relative;
+        overflow: auto;
+        background: #fff;
+      }
+
+      #timeline-canvas {
+        display: block;
+        background: #fff;
+      }
+
+      /* Context Menu */
+      #context-menu {
+        position: absolute;
+        display: none;
+        background: #fff;
+        border: 1px solid #ccc;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        padding: 2px;
+        min-width: 120px;
+      }
+
+      .menu-item {
+        padding: 4px 10px;
+        color: #333;
+        cursor: pointer;
+      }
+
+      .menu-item:hover {
+        background: #eee;
+      }
+
+      /* Code Editor Window */
+      #code-editor-window {
+        width: 500px;
+        height: 400px;
+        display: none;
+        resize: both;
+        overflow: auto;
+        min-width: 300px;
+        min-height: 200px;
+      }
+
+      #code-editor-textarea {
+        width: 100%;
+        flex: 1;
+        border: none;
+        padding: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        resize: none;
+        background: #f9f9f9;
+        outline: none;
+      }
+
+      #code-editor-actions {
+        margin-top: 5px;
+        display: flex;
+        gap: 5px;
+        justify-content: flex-end;
+        flex-shrink: 0;
+      }
+
+      #code-editor-actions button {
+        padding: 5px 15px;
+        border: 1px solid #ccc;
+        background: #f9f9f9;
+        cursor: pointer;
+        border-radius: 2px;
+        font-size: 11px;
+      }
+
+      #code-editor-actions button:hover {
+        background: #eee;
+      }
+
+      /* Code indicator in timeline */
+      .frame-code-indicator {
+        position: absolute;
+        right: 2px;
+        top: 2px;
+        font-size: 8px;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        color: #0066cc;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app">
+      <div id="stage-container">
+        <div id="stage-content">
+          <svg id="main-svg" width="1" height="1" style="overflow: visible;">
+            <g id="drawing-layer"></g>
+            <g id="overlay-layer"></g> <!-- For selection handles etc -->
+          </svg>
+        </div>
+      </div>
+
+      <div id="toolbar-window" class="window">
+        <div class="window-header">Tools</div>
+        <div id="toolbar-body" class="window-body">
+          <!-- Tools injected by JS -->
+        </div>
+      </div>
+
+      <div id="timeline-window" class="window">
+        <div class="window-header" title="Right-click to open in separate window">Timeline</div>
+        <div id="timeline-content-wrapper">
+          <div id="timeline-controls">
+            <button id="btn-select-mode" class="active" title="Select Mode (V)">Select</button>
+            <button id="btn-drag-mode" title="Drag Mode (H)">Drag</button>
+            <button id="btn-resize-mode" title="Resize Mode (E)">Resize</button>
+            <button id="btn-add-layer" title="New Layer">New Layer</button>
+            <button id="btn-undock" title="Open in separate window">Undock</button>
+          </div>
+          <div id="timeline-body">
+            <div id="layer-headers">
+              <!-- Layer names -->
+            </div>
+            <div id="timeline-grid-container">
+              <canvas id="timeline-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="code-editor-window" class="window">
+      <div class="window-header">Frame Code</div>
+
+      <!-- Tabs (Only visible for SVG Editor) -->
+      <div id="editor-tabs" style="display: none; background: #eee; border-bottom: 1px solid #ddd; padding: 0 5px;">
+        <button id="tab-code" class="active"
+          style="border: none; background: #fff; padding: 5px 10px; font-size: 11px; cursor: pointer; border-radius: 4px 4px 0 0; margin-top: 4px; border: 1px solid #ddd; border-bottom: none;">Code</button>
+        <button id="tab-talk"
+          style="border: none; background: transparent; padding: 5px 10px; font-size: 11px; cursor: pointer; margin-top: 4px;">Talk</button>
+      </div>
+
+      <div class="window-body" style="position: relative;">
+        <!-- Code Tab Content -->
+        <div id="tab-content-code" style="display: flex; flex-direction: column; flex: 1; height: 100%;">
+          <textarea id="code-editor-textarea" style="flex: 1;"
+            placeholder="// Enter JavaScript code here&#10;// Available functions: play(), stop(), goto(frame), gotoAndStop(frame), beep(note), playSound(url)"></textarea>
+        </div>
+
+        <!-- Talk Tab Content -->
+        <div id="tab-content-talk" style="display: none; flex-direction: column; flex: 1; height: 100%;">
+          <div id="talk-helper-text" style="margin-bottom: 10px; font-size: 11px; color: #666;">
+            Describe how you want to modify this element.
+          </div>
+          <textarea id="talk-textarea"
+            style="flex: 1; width: 100%; border: 1px solid #ccc; padding: 8px; resize: none; margin-bottom: 10px;"
+            placeholder="e.g., 'Change color to blue' or 'Increase width by 50'"></textarea>
+          <div style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; min-height: 20px;">
+            <span id="talk-status" style="font-size: 10px; color: #666;"></span>
+          </div>
+        </div>
+
+        <div id="code-editor-actions" style="margin-top: 5px;">
+          <button id="code-editor-close">Close</button>
+          <button id="code-editor-save">Save</button>
+          <button id="code-editor-ask" style="display: none;">Ask</button>
+        </div>
+      </div>
+    </div>
+    </div>
+    <div id="context-menu"></div>
+
+    <script>
+      // --- Constants ---
+      const FRAME_WIDTH = 12;
+      const FRAME_HEIGHT = 20;
+      const HEADER_HEIGHT = 20; // Time ruler height
+
+      // --- State Management ---
+      const State = {
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+        currentFrame: 1,
+        totalFrames: 100,
+        activeTool: 'selection',
+        timelineMode: 'select', // 'select', 'drag', or 'resize'
+        layers: [
+          {
+            name: 'Layer 1',
+            frames: {
+              1: { type: 'keyframe', elements: [] }
+            }
+          }
+        ],
+        activeLayerIndex: 0,
+        isDraggingTime: false,
+        selection: [],
+        selectedElementIds: new Set(),
+        clipboard: null,
+        frameClipboard: null, // For timeline frame copy/paste
+        dragState: { active: false, type: null, source: null, target: null }
+      };
+
+      // --- Event Bus ---
+      const Events = {
+        listeners: {},
+        on( event, callback ) {
+          if ( !this.listeners[ event ] ) this.listeners[ event ] = [];
+          this.listeners[ event ].push( callback );
+        },
+        emit( event, data ) {
+          if ( this.listeners[ event ] ) {
+            this.listeners[ event ].forEach( cb => cb( data ) );
+          }
+        }
+      };
+
+      // --- History (Undo/Redo) ---
+      const History = {
+        undoStack: [],
+        redoStack: [],
+        maxDepth: 50,
+
+        saveState() {
+          const stateClone = JSON.parse( JSON.stringify( {
+            layers: State.layers,
+            currentFrame: State.currentFrame,
+            totalFrames: State.totalFrames
+          } ) );
+          this.undoStack.push( stateClone );
+          if ( this.undoStack.length > this.maxDepth ) this.undoStack.shift();
+          this.redoStack = []; // Clear redo on new action
+          // console.log('State saved. Undo stack:', this.undoStack.length);
+        },
+
+        undo() {
+          if ( this.undoStack.length === 0 ) return;
+
+          // Save current state to redo stack before undoing
+          const currentState = JSON.parse( JSON.stringify( {
+            layers: State.layers,
+            currentFrame: State.currentFrame,
+            totalFrames: State.totalFrames
+          } ) );
+          this.redoStack.push( currentState );
+
+          const prevState = this.undoStack.pop();
+          this.restoreState( prevState );
+          // console.log('Undo. Stack:', this.undoStack.length);
+        },
+
+        redo() {
+          if ( this.redoStack.length === 0 ) return;
+
+          // Save current state to undo stack before redoing
+          const currentState = JSON.parse( JSON.stringify( {
+            layers: State.layers,
+            currentFrame: State.currentFrame,
+            totalFrames: State.totalFrames
+          } ) );
+          this.undoStack.push( currentState );
+
+          const nextState = this.redoStack.pop();
+          this.restoreState( nextState );
+          // console.log('Redo. Stack:', this.undoStack.length);
+        },
+
+        restoreState( state ) {
+          State.layers = state.layers;
+          State.currentFrame = state.currentFrame;
+          State.totalFrames = state.totalFrames;
+          drawTimeline();
+          renderStage();
+        }
+      };
+
+      // --- Audio Engine ---
+      const AudioEngine = {
+        ctx: null,
+        oscillators: {}, // Map layerIndex -> { osc, gain }
+        audioBuffers: {}, // Cache for loaded audio buffers
+
+        init() {
+          if ( !this.ctx ) {
+            this.ctx = new ( window.AudioContext || window.webkitAudioContext )();
+          }
+        },
+
+        resume() {
+          if ( this.ctx && this.ctx.state === 'suspended' ) {
+            this.ctx.resume();
+          }
+        },
+
+        async playSound( url ) {
+          this.init();
+          this.resume();
+
+          try {
+            // Use HTML Audio element to avoid CORS issues
+            // Audio elements can play cross-origin audio without CORS headers
+            const audio = new Audio( url );
+            audio.volume = 0.5; // Set reasonable volume
+
+            // Play the audio
+            const playPromise = audio.play();
+
+            // Handle play promise (newer browsers return a promise)
+            if ( playPromise !== undefined ) {
+              playPromise.catch( error => {
+                console.error( `Error playing sound from ${ url }:`, error );
+              } );
+            }
+          } catch ( error ) {
+            console.error( `Error playing sound from ${ url }:`, error );
+          }
+        },
+
+        playTone( layerIndex, midiNote ) {
+          this.init();
+          this.resume();
+          this.stopTone( layerIndex ); // Stop existing tone on this layer
+
+          const freq = 440 * Math.pow( 2, ( midiNote - 69 ) / 12 );
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime( 0.05, this.ctx.currentTime );
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime( 1200, this.ctx.currentTime );
+          filter.Q.setValueAtTime( 0.7, this.ctx.currentTime );
+
+          const osc1 = this.ctx.createOscillator();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime( freq, this.ctx.currentTime );
+
+          const osc2 = this.ctx.createOscillator();
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime( freq, this.ctx.currentTime );
+
+          osc1.connect( filter );
+          osc2.connect( filter );
+          filter.connect( gain );
+          gain.connect( this.ctx.destination );
+
+          osc1.start();
+          osc2.start();
+
+          this.oscillators[ layerIndex ] = { osc1, osc2, gain, filter };
+        },
+
+        setFrequency( layerIndex, freq ) {
+          if ( this.oscillators[ layerIndex ] ) {
+            const { osc1, osc2 } = this.oscillators[ layerIndex ];
+            osc1.frequency.setValueAtTime( freq, this.ctx.currentTime );
+            osc2.frequency.setValueAtTime( freq, this.ctx.currentTime );
+          }
+        },
+
+        stopTone( layerIndex ) {
+          if ( this.oscillators[ layerIndex ] ) {
+            const { osc1, osc2, gain } = this.oscillators[ layerIndex ];
+            // Fade out to avoid clicking
+            try {
+              gain.gain.setTargetAtTime( 0, this.ctx.currentTime, 0.01 );
+              const stopTime = this.ctx.currentTime + 0.05;
+              osc1.stop( stopTime );
+              osc2.stop( stopTime );
+            } catch ( e ) {
+              // Ignore errors if already stopped
+            }
+            delete this.oscillators[ layerIndex ];
+          }
+        },
+
+        stopAll() {
+          Object.keys( this.oscillators ).forEach( key => this.stopTone( key ) );
+        }
+      };
+
+      // --- Helper Functions for Dragging ---
+      function moveFrame( srcFrame, srcLayerIndex, destFrame, destLayerIndex ) {
+        if ( srcFrame === destFrame && srcLayerIndex === destLayerIndex ) return;
+
+        const srcLayer = State.layers[ srcLayerIndex ];
+        const destLayer = State.layers[ destLayerIndex ];
+
+        if ( !srcLayer || !destLayer ) return;
+
+        // Copy data
+        if ( srcLayer.frames[ srcFrame ] ) {
+          // If destination exists, we overwrite it (standard behavior)
+          destLayer.frames[ destFrame ] = JSON.parse( JSON.stringify( srcLayer.frames[ srcFrame ] ) );
+          delete srcLayer.frames[ srcFrame ];
+        }
+
+        State.currentFrame = destFrame;
+        drawTimeline();
+        renderStage();
+      }
+
+      function moveSelection( deltaF, deltaL ) {
+        if ( !State.timelineSelection ) return;
+
+        const s = State.timelineSelection;
+        // Calculate bounds
+        const fStart = Math.min( s.startFrame, s.endFrame );
+        const fEnd = Math.max( s.startFrame, s.endFrame );
+        const lStart = Math.min( s.startLayer, s.endLayer );
+        const lEnd = Math.max( s.startLayer, s.endLayer );
+
+        // Collect frames to move
+        const framesToMove = [];
+        for ( let l = lStart; l <= lEnd; l++ ) {
+          const layer = State.layers[ l ];
+          if ( !layer ) continue;
+          for ( let f = fStart; f <= fEnd; f++ ) {
+            if ( layer.frames[ f ] ) {
+              framesToMove.push( {
+                layerIndex: l,
+                frame: f,
+                data: JSON.parse( JSON.stringify( layer.frames[ f ] ) )
+              } );
+            }
+          }
+        }
+
+        // 1. Clear Source
+        for ( let l = lStart; l <= lEnd; l++ ) {
+          const layer = State.layers[ l ];
+          if ( !layer ) continue;
+          for ( let f = fStart; f <= fEnd; f++ ) {
+            delete layer.frames[ f ];
+          }
+        }
+
+        // 2. Write Dest
+        framesToMove.forEach( item => {
+          const newL = item.layerIndex + deltaL;
+          const newF = item.frame + deltaF;
+
+          if ( newL >= 0 && newL < State.layers.length && newF >= 1 ) {
+            State.layers[ newL ].frames[ newF ] = item.data;
+          }
+        } );
+
+        // 3. Update Selection
+        State.timelineSelection.startFrame += deltaF;
+        State.timelineSelection.endFrame += deltaF;
+        State.timelineSelection.startLayer += deltaL;
+        State.timelineSelection.endLayer += deltaL;
+
+        drawTimeline();
+        renderStage();
+      }
+
+      // --- Copy/Paste Frames ---
+      function copyFrames() {
+        if ( !State.timelineSelection ) return;
+
+        const s = State.timelineSelection;
+        const fStart = Math.min( s.startFrame, s.endFrame );
+        const fEnd = Math.max( s.startFrame, s.endFrame );
+        const lStart = Math.min( s.startLayer, s.endLayer );
+        const lEnd = Math.max( s.startLayer, s.endLayer );
+
+        // Collect frames to copy (sequential, no gaps)
+        const framesToCopy = [];
+        let frameIndex = 0; // Sequential index for pasting without gaps
+
+        for ( let l = lStart; l <= lEnd; l++ ) {
+          const layer = State.layers[ l ];
+          if ( !layer ) continue;
+
+          let layerFrameIndex = 0;
+          for ( let f = fStart; f <= fEnd; f++ ) {
+            if ( layer.frames[ f ] ) {
+              framesToCopy.push( {
+                layerIndex: l - lStart, // Relative to selection start
+                frameNum: layerFrameIndex++, // Sequential, no gaps
+                data: JSON.parse( JSON.stringify( layer.frames[ f ] ) )
+              } );
+            }
+          }
+        }
+
+        State.frameClipboard = {
+          frames: framesToCopy,
+          width: fEnd - fStart + 1,
+          height: lEnd - lStart + 1
+        };
+
+        console.log( `Copied ${ framesToCopy.length } frame(s)` );
+      }
+
+      function pasteFrames() {
+        if ( !State.frameClipboard || State.frameClipboard.frames.length === 0 ) return;
+
+        History.saveState();
+
+        // Use selected frame if available, otherwise use current frame
+        let pasteStartFrame = State.currentFrame;
+        let pasteStartLayer = State.activeLayerIndex;
+
+        if ( State.timelineSelection ) {
+          const s = State.timelineSelection;
+          pasteStartFrame = Math.min( s.startFrame, s.endFrame );
+          pasteStartLayer = Math.min( s.startLayer, s.endLayer );
+        }
+
+        State.frameClipboard.frames.forEach( item => {
+          const targetLayer = pasteStartLayer + item.layerIndex;
+          const targetFrame = pasteStartFrame + item.frameNum;
+
+          if ( targetLayer >= 0 && targetLayer < State.layers.length && targetFrame >= 1 ) {
+            State.layers[ targetLayer ].frames[ targetFrame ] = JSON.parse( JSON.stringify( item.data ) );
+          }
+        } );
+
+        console.log( `Pasted ${ State.frameClipboard.frames.length } frame(s) at frame ${ pasteStartFrame }` );
+
+        drawTimeline();
+        renderStage();
+      }
+
+      // --- Timeline Window State ---
+      let timelineWindow = null; // Reference to popup window
+      let timelineContainer = null; // Reference to original container
+
+
+      // --- Initialization ---
+      function init() {
+        console.log( 'Initializing Flash Clone...' );
+        renderToolbar();
+        renderTimeline();
+        setupStage();
+        setupInteractions();
+        setupTimelineInteractions();
+        setupDraggableWindows();
+        setupTimelineInteractions();
+        setupDraggableWindows();
+        setupCodeEditor();
+        setupUndoRedo();
+
+        // Initial Render
+        updateStageTransform();
+        drawTimeline();
+        renderStage();
+      }
+
+      function setupDraggableWindows() {
+        const windows = document.querySelectorAll( '.window' );
+        windows.forEach( win => {
+          const header = win.querySelector( '.window-header' );
+          let isDragging = false;
+          let startPos = { x: 0, y: 0 };
+          let winPos = { x: 0, y: 0 };
+
+          header.addEventListener( 'mousedown', ( e ) => {
+            // Only drag on left click
+            if ( e.button !== 0 ) return;
+
+            // Don't drag window if clicking buttons inside header
+            if ( e.target.tagName === 'BUTTON' ) return;
+
+            isDragging = true;
+            startPos = { x: e.clientX, y: e.clientY };
+            winPos = { x: win.offsetLeft, y: win.offsetTop };
+            e.preventDefault(); // Prevent text selection
+          } );
+
+          window.addEventListener( 'mousemove', ( e ) => {
+            if ( isDragging ) {
+              const dx = e.clientX - startPos.x;
+              const dy = e.clientY - startPos.y;
+              win.style.left = ( winPos.x + dx ) + 'px';
+              win.style.top = ( winPos.y + dy ) + 'px';
+            }
+          } );
+
+          window.addEventListener( 'mouseup', () => {
+            isDragging = false;
+          } );
+        } );
+      }
+
+      function setupUndoRedo() {
+        window.addEventListener( 'keydown', ( e ) => {
+          // Undo: Cmd+Z or Ctrl+Z
+          if ( ( e.metaKey || e.ctrlKey ) && e.key.toLowerCase() === 'z' && !e.shiftKey ) {
+            e.preventDefault();
+            History.undo();
+          }
+          // Redo: Cmd+Shift+Z or Ctrl+Y
+          else if ( ( ( e.metaKey || e.ctrlKey ) && e.key.toLowerCase() === 'z' && e.shiftKey ) ||
+            ( ( e.metaKey || e.ctrlKey ) && e.key.toLowerCase() === 'y' ) ) {
+            e.preventDefault();
+            History.redo();
+          }
+          // Copy: Cmd+C or Ctrl+C
+          else if ( ( e.metaKey || e.ctrlKey ) && e.key.toLowerCase() === 'c' && !isEditingCode && !isEditingSVG ) {
+            e.preventDefault();
+            copyFrames();
+          }
+          // Paste: Cmd+V or Ctrl+V
+          else if ( ( e.metaKey || e.ctrlKey ) && e.key.toLowerCase() === 'v' && !isEditingCode && !isEditingSVG ) {
+            e.preventDefault();
+            pasteFrames();
+          }
+        } );
+      }
+
+      // --- Toolbar ---
+      const Tools = [
+        { id: 'selection', icon: 'Select', label: 'Selection Tool (V)' },
+        { id: 'drag', icon: 'Drag', label: 'Drag Tool (D)' },
+        { id: 'square', icon: 'Rect', label: 'Rectangle Tool (R)' },
+        { id: 'brush', icon: 'Brush', label: 'Brush Tool (B)' },
+        { id: 'save', icon: 'Save', label: 'Save Project' },
+        { id: 'open', icon: 'Open', label: 'Open Project' },
+        { id: 'export', icon: 'Export', label: 'Export SVG' }
+      ];
+
+      function renderToolbar() {
+        const toolbar = document.getElementById( 'toolbar-body' );
+        toolbar.innerHTML = ''; // Clear to prevent duplicates
+        Tools.forEach( tool => {
+          const btn = document.createElement( 'div' );
+          btn.className = `tool-btn ${ State.activeTool === tool.id ? 'active' : '' }`;
+          btn.textContent = tool.icon;
+          btn.title = tool.label;
+          btn.onclick = () => {
+            if ( tool.id === 'export' ) {
+              exportSVG();
+            } else if ( tool.id === 'save' ) {
+              saveProject();
+            } else if ( tool.id === 'open' ) {
+              loadProject();
+            } else {
+              setTool( tool.id );
+            }
+          };
+          toolbar.appendChild( btn );
+        } );
+      }
+
+      function setTool( toolId ) {
+        State.activeTool = toolId;
+        document.querySelectorAll( '.tool-btn' ).forEach( btn => {
+          btn.classList.toggle( 'active', btn.title.includes( Tools.find( t => t.id === toolId ).label ) );
+        } );
+        Events.emit( 'toolChanged', toolId );
+      }
+
+      // --- Timeline ---
+      function renderTimeline() {
+        let doc = document;
+        if ( timelineWindow && !timelineWindow.closed ) {
+          doc = timelineWindow.document;
+        }
+        const layerHeaders = doc.getElementById( 'layer-headers' );
+        if ( !layerHeaders ) return;
+
+        layerHeaders.innerHTML = '';
+
+        // Spacer for Time Ruler Header
+        const spacer = document.createElement( 'div' );
+        spacer.style.height = HEADER_HEIGHT + 'px';
+        spacer.style.borderBottom = '1px solid #ccc'; // Match header border
+        spacer.style.background = '#eee';
+        layerHeaders.appendChild( spacer );
+
+        State.layers.forEach( ( layer, index ) => {
+          const div = document.createElement( 'div' );
+          div.className = 'layer-header';
+          div.textContent = layer.name;
+          if ( index === State.activeLayerIndex ) {
+            div.style.background = '#e0e0e0';
+            div.style.fontWeight = 'bold';
+          }
+          div.onclick = () => {
+            State.activeLayerIndex = index;
+            renderTimeline();
+            drawTimeline();
+            renderStage();
+          };
+          layerHeaders.appendChild( div );
+        } );
+      }
+
+      function setTimelineMode( mode ) {
+        State.timelineMode = mode;
+        updateTimelineButtons();
+      }
+
+      function updateTimelineButtons() {
+        if ( State.timelineButtons ) {
+          State.timelineButtons.select.style.fontWeight = State.timelineMode === 'select' ? 'bold' : 'normal';
+          State.timelineButtons.drag.style.fontWeight = State.timelineMode === 'drag' ? 'bold' : 'normal';
+          State.timelineButtons.resize.style.fontWeight = State.timelineMode === 'resize' ? 'bold' : 'normal';
+          State.timelineButtons.select.style.background = State.timelineMode === 'select' ? '#ddd' : '#f9f9f9';
+          State.timelineButtons.drag.style.background = State.timelineMode === 'drag' ? '#ddd' : '#f9f9f9';
+          State.timelineButtons.resize.style.background = State.timelineMode === 'resize' ? '#ddd' : '#f9f9f9';
+        }
+      }
+
+      // --- Timeline Drawing ---
+      function drawTimeline() {
+        // Handle undocked state
+        let doc = document;
+        if ( timelineWindow && !timelineWindow.closed ) {
+          doc = timelineWindow.document;
+        }
+
+        const canvas = doc.getElementById( 'timeline-canvas' );
+        const container = doc.getElementById( 'timeline-grid-container' );
+
+        if ( !canvas || !container ) return; // Safety check
+
+        // Resize canvas to match container width (or more) and layers height
+        const width = Math.max( container.clientWidth, State.totalFrames * FRAME_WIDTH );
+        const height = Math.max( container.clientHeight, ( State.layers.length * FRAME_HEIGHT ) + HEADER_HEIGHT );
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext( '2d' );
+        ctx.fillStyle = '#fff';
+        ctx.fillRect( 0, 0, width, height );
+
+        // Draw Header
+        ctx.fillStyle = '#eee';
+        ctx.fillRect( 0, 0, width, HEADER_HEIGHT );
+        ctx.strokeStyle = '#ccc';
+        ctx.beginPath();
+        ctx.moveTo( 0, HEADER_HEIGHT );
+        ctx.lineTo( width, HEADER_HEIGHT );
+        ctx.stroke();
+
+        // Draw Frame Numbers
+        ctx.fillStyle = '#000';
+        ctx.font = '10px sans-serif';
+        for ( let i = 1; i <= State.totalFrames; i += 5 ) {
+          const x = ( i - 1 ) * FRAME_WIDTH;
+          ctx.fillText( i, x + 2, 14 );
+          // Ticks
+          ctx.beginPath();
+          ctx.moveTo( x, 15 );
+          ctx.lineTo( x, HEADER_HEIGHT );
+          ctx.stroke();
+        }
+
+        // Draw Grid
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+
+        // Vertical lines
+        for ( let i = 0; i <= State.totalFrames; i++ ) {
+          const x = i * FRAME_WIDTH;
+          ctx.beginPath();
+          ctx.moveTo( x, HEADER_HEIGHT );
+          ctx.lineTo( x, height );
+          ctx.stroke();
+        }
+
+        // Horizontal lines & Layer content
+        State.layers.forEach( ( layer, index ) => {
+          const y = HEADER_HEIGHT + ( index * FRAME_HEIGHT );
+
+          // Row separator
+          ctx.beginPath();
+          ctx.moveTo( 0, y + FRAME_HEIGHT );
+          ctx.lineTo( width, y + FRAME_HEIGHT );
+          ctx.strokeStyle = '#ccc';
+          ctx.stroke();
+
+          // Highlight Active Layer Row
+          if ( index === State.activeLayerIndex ) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // Very subtle highlight
+            ctx.fillRect( 0, y, width, FRAME_HEIGHT );
+          }
+
+          // Draw Frames
+          for ( let f = 1; f <= State.totalFrames; f++ ) {
+            const x = ( f - 1 ) * FRAME_WIDTH;
+            const frameData = layer.frames[ f ];
+
+            // Check selection
+            let isSelected = false;
+            if ( State.timelineSelection ) {
+              const s = State.timelineSelection;
+              // Normalize selection range
+              const fStart = Math.min( s.startFrame, s.endFrame );
+              const fEnd = Math.max( s.startFrame, s.endFrame );
+              const lStart = Math.min( s.startLayer, s.endLayer );
+              const lEnd = Math.max( s.startLayer, s.endLayer );
+
+              if ( f >= fStart && f <= fEnd && index >= lStart && index <= lEnd ) {
+                isSelected = true;
+              }
+            }
+
+            // Background for selection
+            if ( isSelected ) {
+              ctx.fillStyle = '#000'; // Selected style (Flash 5 style: black background)
+              ctx.fillRect( x + 1, y + 1, FRAME_WIDTH - 1, FRAME_HEIGHT - 1 );
+            } else if ( frameData ) {
+              // Normal frame backgrounds
+              if ( frameData.isTransition ) {
+                ctx.fillStyle = 'rgba(180, 160, 255, 0.5)'; // Subtle purple for transition
+                ctx.fillRect( x + 1, y + 1, FRAME_WIDTH - 1, FRAME_HEIGHT - 1 );
+
+                // Draw Arrow (simplified: line across)
+                const nextFrame = layer.frames[ f + 1 ];
+                if ( nextFrame && ( nextFrame.isTransition || nextFrame.type === 'keyframe' ) ) {
+                  ctx.beginPath();
+                  ctx.moveTo( x + FRAME_WIDTH / 2, y + FRAME_HEIGHT / 2 );
+                  ctx.lineTo( x + FRAME_WIDTH * 1.5, y + FRAME_HEIGHT / 2 );
+                  ctx.strokeStyle = '#666';
+                  ctx.stroke();
+                }
+                // Arrow head at the end?
+                if ( nextFrame && nextFrame.type === 'keyframe' ) {
+                  // Draw arrow head
+                  const cx = x + FRAME_WIDTH - 5;
+                  const cy = y + FRAME_HEIGHT / 2;
+                  ctx.beginPath();
+                  ctx.moveTo( cx - 5, cy - 3 );
+                  ctx.lineTo( cx, cy );
+                  ctx.lineTo( cx - 5, cy + 3 );
+                  ctx.stroke();
+                }
+
+              } else if ( frameData.type === 'keyframe' ) {
+                ctx.fillStyle = '#ccc';
+                ctx.fillRect( x + 1, y + 1, FRAME_WIDTH - 1, FRAME_HEIGHT - 1 );
+              } else if ( frameData.type === 'frame' ) {
+                ctx.fillStyle = '#ddd';
+                ctx.fillRect( x + 1, y + 1, FRAME_WIDTH - 1, FRAME_HEIGHT - 1 );
+              }
+            }
+
+            // Content indicators (dots/lines)
+            if ( frameData ) {
+              if ( frameData.type === 'keyframe' ) {
+                ctx.fillStyle = isSelected ? '#fff' : '#000'; // Invert color if selected
+                ctx.beginPath();
+                ctx.arc( x + FRAME_WIDTH / 2, y + FRAME_HEIGHT / 2, 3, 0, Math.PI * 2 );
+                ctx.fill();
+              } else if ( frameData.type === 'frame' ) {
+                // Maybe a small rectangle or nothing?
+              }
+
+              // Code indicator - small 'a' letter if frame has code
+              if ( frameData.code && frameData.code.trim() !== '' ) {
+                ctx.fillStyle = isSelected ? '#88ccff' : '#0066cc';
+                ctx.font = 'bold 8px "Courier New", monospace';
+                ctx.fillText( 'a', x + FRAME_WIDTH - 7, y + 9 );
+              }
+            }
+          }
+        } );
+
+        // Ghost Frame Preview
+        if ( State.dragState.active && State.dragState.target ) {
+          const { frame, layerIndex } = State.dragState.target;
+
+          if ( State.dragState.type === 'frame' ) {
+            const x = ( frame - 1 ) * FRAME_WIDTH;
+            const y = HEADER_HEIGHT + layerIndex * FRAME_HEIGHT;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect( x + 1, y + 1, FRAME_WIDTH - 1, FRAME_HEIGHT - 1 );
+          } else if ( State.dragState.type === 'selection' && State.timelineSelection ) {
+            // Calculate offset
+            const deltaF = frame - State.dragState.source.frame;
+            const deltaL = layerIndex - State.dragState.source.layerIndex;
+
+            const s = State.timelineSelection;
+            const fStart = Math.min( s.startFrame, s.endFrame ) + deltaF;
+            const fEnd = Math.max( s.startFrame, s.endFrame ) + deltaF;
+            const lStart = Math.min( s.startLayer, s.endLayer ) + deltaL;
+            const lEnd = Math.max( s.startLayer, s.endLayer ) + deltaL;
+
+            const width = ( fEnd - fStart + 1 ) * FRAME_WIDTH;
+            const height = ( lEnd - lStart + 1 ) * FRAME_HEIGHT;
+            const startX = ( fStart - 1 ) * FRAME_WIDTH;
+            const startY = HEADER_HEIGHT + lStart * FRAME_HEIGHT;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect( startX, startY, width, height );
+          }
+        }
+
+        // Draw Playhead (Full height translucent line)
+        const playheadX = ( State.currentFrame - 1 ) * FRAME_WIDTH;
+
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fillRect( playheadX, HEADER_HEIGHT, FRAME_WIDTH, height - HEADER_HEIGHT );
+
+        // Playhead Head (in Header)
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+        ctx.fillRect( playheadX, 0, FRAME_WIDTH, HEADER_HEIGHT );
+
+        // Red line center
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo( playheadX + FRAME_WIDTH / 2, 0 );
+        ctx.lineTo( playheadX + FRAME_WIDTH / 2, height );
+        ctx.stroke();
+      }
+      function setupTimelineInteractions() {
+        // Handle undocked state
+        let doc = document;
+        let win = window;
+
+        if ( timelineWindow && !timelineWindow.closed ) {
+          doc = timelineWindow.document;
+          win = timelineWindow;
+        }
+
+        const canvas = doc.getElementById( 'timeline-canvas' );
+        const timelineHeader = document.querySelector( '#timeline-window .window-header' );
+
+        // Bind Controls
+        const btnSelect = doc.getElementById( 'btn-select-mode' );
+        const btnDrag = doc.getElementById( 'btn-drag-mode' );
+        const btnResize = doc.getElementById( 'btn-resize-mode' );
+        const btnUndock = doc.getElementById( 'btn-undock' );
+
+        if ( btnSelect && btnDrag ) {
+          btnSelect.onclick = () => setTimelineMode( 'select' );
+          btnDrag.onclick = () => setTimelineMode( 'drag' );
+          if ( btnResize ) btnResize.onclick = () => setTimelineMode( 'resize' );
+
+          if ( btnUndock ) {
+            btnUndock.onclick = () => openTimelinePopup();
+          }
+
+          const btnAddLayer = doc.getElementById( 'btn-add-layer' );
+          if ( btnAddLayer ) {
+            btnAddLayer.onclick = () => addNewLayer();
+          }
+
+          // Store refs to update active state
+          State.timelineButtons = { select: btnSelect, drag: btnDrag, resize: btnResize };
+          updateTimelineButtons();
+        }
+
+        // Add Context Menu to Header for "Open in separate window"
+        if ( timelineHeader && ( !timelineWindow || timelineWindow.closed ) ) {
+          const showHeaderMenu = ( e ) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const menu = document.getElementById( 'context-menu' );
+            menu.innerHTML = '';
+
+            const item = document.createElement( 'div' );
+            item.className = 'menu-item';
+            item.textContent = 'Open in separate window';
+            item.onclick = () => {
+              openTimelinePopup();
+              menu.style.display = 'none';
+            };
+
+            menu.appendChild( item );
+            menu.style.display = 'block';
+            menu.style.left = e.pageX + 'px';
+            menu.style.top = e.pageY + 'px';
+          };
+
+          timelineHeader.addEventListener( 'contextmenu', showHeaderMenu );
+        }
+
+        let contextMenuFrame = null;
+        let contextMenuLayerIndex = null;
+
+        // Scrubbing (Header only)
+        let isScrubbing = false;
+
+        // Selection (Grid)
+        let isSelecting = false;
+
+        const getFrameAndLayer = ( e ) => {
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const frame = Math.floor( x / FRAME_WIDTH ) + 1;
+          const layerIndex = Math.floor( ( y - HEADER_HEIGHT ) / FRAME_HEIGHT );
+          return { frame, layerIndex, y };
+        };
+
+        const isFrameSelected = ( frame, layerIndex ) => {
+          if ( !State.timelineSelection ) return false;
+          const s = State.timelineSelection;
+          const fStart = Math.min( s.startFrame, s.endFrame );
+          const fEnd = Math.max( s.startFrame, s.endFrame );
+          const lStart = Math.min( s.startLayer, s.endLayer );
+          const lEnd = Math.max( s.startLayer, s.endLayer );
+          return frame >= fStart && frame <= fEnd && layerIndex >= lStart && layerIndex <= lEnd;
+        };
+
+        canvas.addEventListener( 'mousedown', ( e ) => {
+          if ( e.button === 0 ) { // Left click
+            const { frame, layerIndex, y } = getFrameAndLayer( e );
+
+            if ( y <= HEADER_HEIGHT ) {
+              // Header click - always scrub
+              isScrubbing = true;
+              State.currentFrame = Math.max( 1, Math.min( frame, State.totalFrames ) );
+              drawTimeline();
+              renderStage();
+            } else {
+              // Grid click
+              if ( State.timelineMode === 'select' ) {
+                // Start Selection
+                isSelecting = true;
+                State.timelineSelection = {
+                  startFrame: frame,
+                  endFrame: frame,
+                  startLayer: layerIndex,
+                  endLayer: layerIndex
+                };
+                drawTimeline();
+              } else if ( State.timelineMode === 'resize' ) {
+                // Resize mode
+                if ( layerIndex >= 0 && layerIndex < State.layers.length ) {
+                  const layer = State.layers[ layerIndex ];
+                  if ( layer.frames[ frame ] ) {
+                    State.dragState = {
+                      active: true,
+                      type: 'resize',
+                      source: { frame, layerIndex },
+                      target: { frame, layerIndex }
+                    };
+                    canvas.style.cursor = 'col-resize';
+                  }
+                }
+              } else if ( State.timelineMode === 'drag' ) {
+                // Check if we are clicking inside an existing selection
+                if ( isFrameSelected( frame, layerIndex ) ) {
+                  State.dragState = {
+                    active: true,
+                    type: 'selection',
+                    source: { frame, layerIndex },
+                    target: { frame, layerIndex }
+                  };
+                  canvas.style.cursor = 'grabbing';
+                } else {
+                  // Single frame drag
+                  if ( layerIndex >= 0 && layerIndex < State.layers.length ) {
+                    const layer = State.layers[ layerIndex ];
+                    if ( layer.frames[ frame ] ) {
+                      State.dragState = {
+                        active: true,
+                        type: 'frame',
+                        source: { frame, layerIndex },
+                        target: { frame, layerIndex }
+                      };
+                      canvas.style.cursor = 'grabbing';
+                    }
+                  }
+                }
+              }
+            }
+            // Hide menu if open
+            const menu = doc.getElementById( 'context-menu' );
+            if ( menu ) menu.style.display = 'none';
+          }
+        } );
+
+        canvas.addEventListener( 'dblclick', ( e ) => {
+          const { frame, layerIndex, y } = getFrameAndLayer( e );
+
+          // Only open code editor if clicking in the grid area (not header)
+          if ( y > HEADER_HEIGHT && layerIndex >= 0 && layerIndex < State.layers.length ) {
+            showCodeEditor( frame, layerIndex );
+          }
+        } );
+
+        win.addEventListener( 'mousemove', ( e ) => {
+          if ( isScrubbing ) {
+            const { frame } = getFrameAndLayer( e );
+            if ( frame >= 1 && frame <= State.totalFrames ) {
+              State.currentFrame = frame;
+              drawTimeline();
+              renderStage();
+            }
+          } else if ( isSelecting ) {
+            const { frame, layerIndex } = getFrameAndLayer( e );
+            State.timelineSelection.endFrame = frame;
+            State.timelineSelection.endLayer = layerIndex;
+            drawTimeline();
+          } else if ( State.dragState.active ) {
+            const { frame, layerIndex } = getFrameAndLayer( e );
+            State.dragState.target = { frame, layerIndex };
+            drawTimeline(); // Redraw for ghost frame
+          }
+        } );
+
+        win.addEventListener( 'mouseup', ( e ) => {
+          if ( isScrubbing ) isScrubbing = false;
+          if ( isSelecting ) isSelecting = false;
+
+          if ( State.dragState.active ) {
+            const { frame, layerIndex } = getFrameAndLayer( e );
+
+            if ( State.dragState.type === 'frame' ) {
+              if ( State.dragState.source && ( frame !== State.dragState.source.frame || layerIndex !== State.dragState.source.layerIndex ) ) {
+                History.saveState();
+                moveFrame( State.dragState.source.frame, State.dragState.source.layerIndex, frame, layerIndex );
+              }
+            } else if ( State.dragState.type === 'selection' ) {
+              const deltaF = frame - State.dragState.source.frame;
+              const deltaL = layerIndex - State.dragState.source.layerIndex;
+              if ( deltaF !== 0 || deltaL !== 0 ) {
+                History.saveState();
+                moveSelection( deltaF, deltaL );
+              }
+            } else if ( State.dragState.type === 'resize' ) {
+              const srcFrame = State.dragState.source.frame;
+              const srcLayerIndex = State.dragState.source.layerIndex;
+              const destFrame = frame;
+
+              // Only resize if on same layer
+              if ( srcLayerIndex === layerIndex ) {
+                const layer = State.layers[ srcLayerIndex ];
+                if ( layer && layer.frames[ srcFrame ] ) {
+                  if ( destFrame !== srcFrame ) {
+                    History.saveState();
+                  }
+                  if ( destFrame > srcFrame ) {
+                    // Expand: Fill with simple frames
+                    const sourceData = layer.frames[ srcFrame ];
+                    for ( let f = srcFrame + 1; f <= destFrame; f++ ) {
+                      // Create a simple frame copy
+                      const newFrame = JSON.parse( JSON.stringify( sourceData ) );
+                      newFrame.type = 'frame'; // Force to simple frame
+                      delete newFrame.code; // Ensure code is not duplicated
+                      // If source was keyframe, maybe keep elements? Yes, simple frames share content usually.
+                      // In Flash, simple frames are just continuations.
+                      // Here we are copying the data.
+                      layer.frames[ f ] = newFrame;
+                    }
+                  } else if ( destFrame < srcFrame ) {
+                    // Shrink: Remove frames
+                    for ( let f = destFrame + 1; f <= srcFrame; f++ ) {
+                      delete layer.frames[ f ];
+                    }
+                  }
+                  renderStage();
+                }
+              }
+            }
+
+            State.dragState = { active: false, type: null, source: null, target: null };
+            canvas.style.cursor = 'default';
+            drawTimeline(); // Clear ghost
+          }
+        } );
+
+        // Context Menu on Grid
+        canvas.addEventListener( 'contextmenu', ( e ) => {
+          e.preventDefault();
+          const { frame, layerIndex } = getFrameAndLayer( e );
+          contextMenuFrame = frame;
+          contextMenuLayerIndex = layerIndex;
+
+          renderContextMenu( frame, layerIndex );
+
+          const menu = doc.getElementById( 'context-menu' );
+          menu.style.display = 'block';
+          menu.style.left = e.pageX + 'px';
+          menu.style.top = e.pageY + 'px';
+        } );
+
+        // Hide menu on click elsewhere
+        win.addEventListener( 'click', ( e ) => {
+          const menu = doc.getElementById( 'context-menu' );
+          if ( menu && !menu.contains( e.target ) ) {
+            menu.style.display = 'none';
+          }
+        } );
+      }
+
+      function renderContextMenu( frame, layerIndex ) {
+        // Handle undocked state
+        let doc = document;
+        if ( timelineWindow && !timelineWindow.closed ) {
+          doc = timelineWindow.document;
+        }
+
+        // Ensure menu exists in the correct doc
+        let menu = doc.getElementById( 'context-menu' );
+        if ( !menu ) {
+          menu = doc.createElement( 'div' );
+          menu.id = 'context-menu';
+          menu.className = 'context-menu';
+          // Copy styles if needed, but we copied all styles to popup head
+          doc.body.appendChild( menu );
+        }
+
+        menu.innerHTML = '';
+
+        const options = [
+          { label: 'Insert Keyframe', action: () => insertKeyframe( frame, layerIndex ) },
+          { label: 'Insert Frame', action: () => insertFrame( frame, layerIndex ) },
+          { label: 'Code', action: () => showCodeEditor( frame, layerIndex ) },
+          { label: 'Copy Frame(s)', action: () => copyFrames() },
+          {
+            label: State.frameClipboard && State.frameClipboard.frames.length > 0
+              ? `Paste Frame(s) (${ State.frameClipboard.frames.length })`
+              : 'Paste Frame(s)',
+            action: () => pasteFrames(),
+            disabled: !State.frameClipboard || State.frameClipboard.frames.length === 0
+          }
+        ];
+
+        // Check for selection to add Transition option
+        if ( State.timelineSelection ) {
+          const s = State.timelineSelection;
+          const fStart = Math.min( s.startFrame, s.endFrame );
+          const fEnd = Math.max( s.startFrame, s.endFrame );
+          const lStart = Math.min( s.startLayer, s.endLayer );
+          const lEnd = Math.max( s.startLayer, s.endLayer );
+
+          if ( frame >= fStart && frame <= fEnd && layerIndex >= lStart && layerIndex <= lEnd ) {
+            options.push( { label: 'Interpolate', action: () => createTransition() } );
+          }
+        }
+
+        options.forEach( opt => {
+          const div = doc.createElement( 'div' ); // Use doc for creating element
+          div.className = 'menu-item';
+          div.textContent = opt.label;
+
+          if ( opt.disabled ) {
+            div.style.color = '#999';
+            div.style.cursor = 'default';
+          } else {
+            div.onclick = () => {
+              opt.action();
+              menu.style.display = 'none';
+            };
+          }
+
+          menu.appendChild( div );
+        } );
+      }
+
+      function insertKeyframe( frame, layerIndex ) {
+        const layer = State.layers[ layerIndex ];
+        if ( !layer.frames[ frame ] ) {
+          History.saveState();
+          // Find previous keyframe to copy from
+          let prevKeyframe = null;
+          for ( let f = frame - 1; f >= 1; f-- ) {
+            if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+              prevKeyframe = layer.frames[ f ];
+              break;
+            }
+          }
+
+          let newElements = [];
+          if ( prevKeyframe ) {
+            // Deep copy elements
+            newElements = JSON.parse( JSON.stringify( prevKeyframe.elements ) );
+          }
+
+          layer.frames[ frame ] = { type: 'keyframe', elements: newElements };
+          drawTimeline();
+          renderStage(); // Update stage if we are on this frame
+        }
+      }
+
+      function insertFrame( frame, layerIndex ) {
+        const layer = State.layers[ layerIndex ];
+        // Logic to extend previous keyframe
+        // For now, just mark as 'frame'
+        if ( !layer.frames[ frame ] ) {
+          History.saveState();
+          layer.frames[ frame ] = { type: 'frame' };
+          drawTimeline();
+        }
+      }
+
+      function addNewLayer() {
+        History.saveState();
+        const newLayerIndex = State.layers.length;
+        const newLayerName = `Layer ${ newLayerIndex + 1 }`;
+        State.layers.push( {
+          name: newLayerName,
+          frames: { 1: { type: 'keyframe', elements: [] } } // Start with empty keyframe
+        } );
+        State.activeLayerIndex = newLayerIndex;
+        renderTimeline();
+        drawTimeline();
+        renderStage();
+      }
+
+      function createTransition() {
+        if ( !State.timelineSelection ) return;
+        const s = State.timelineSelection;
+        const fStart = Math.min( s.startFrame, s.endFrame );
+        const fEnd = Math.max( s.startFrame, s.endFrame );
+        const lStart = Math.min( s.startLayer, s.endLayer );
+        const lEnd = Math.max( s.startLayer, s.endLayer );
+
+        History.saveState();
+
+        for ( let l = lStart; l <= lEnd; l++ ) {
+          if ( State.layers[ l ] ) {
+            // Ensure start is a keyframe (or find previous)
+            // For now, assume user selects range starting with keyframe or we just mark frames
+
+            // Fill frames between start and end
+            for ( let f = fStart; f <= fEnd; f++ ) {
+              if ( !State.layers[ l ].frames[ f ] ) {
+                State.layers[ l ].frames[ f ] = { type: 'frame' };
+              }
+              // Don't overwrite keyframes type, just add flag
+              if ( State.layers[ l ].frames[ f ].type !== 'keyframe' || f === fStart ) {
+                State.layers[ l ].frames[ f ].isTransition = true;
+              }
+            }
+          }
+        }
+        drawTimeline();
+        renderStage();
+      }
+
+      // --- Code Editor ---
+      let currentCodeFrame = null;
+      let currentCodeLayerIndex = null;
+      let isEditingCode = false; // Track if user is editing code
+
+      // SVG Editor State
+      let isEditingSVG = false;
+      let currentEditingElementId = null;
+
+      function showCodeEditor( frame, layerIndex ) {
+        currentCodeFrame = frame;
+        currentCodeLayerIndex = layerIndex;
+        isEditingCode = true;
+
+        const editorWindow = document.getElementById( 'code-editor-window' );
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        const header = editorWindow.querySelector( '.window-header' );
+
+        // Update header
+        header.textContent = `Frame ${ frame } Code (Layer ${ State.layers[ layerIndex ].name })`;
+
+        // Load existing code or empty
+        const layer = State.layers[ layerIndex ];
+        // Ensure frame exists
+        if ( !layer.frames[ frame ] ) {
+          // Auto-create frame if it doesn't exist
+          layer.frames[ frame ] = { type: 'frame' };
+        }
+
+        const frameData = layer.frames[ frame ];
+        textarea.value = frameData.code || '';
+
+        // Show and position window
+        editorWindow.style.display = 'flex';
+        if ( editorWindow.style.left === '' ) {
+          // Center on first show
+          editorWindow.style.left = '50%';
+          editorWindow.style.top = '50%';
+          editorWindow.style.transform = 'translate(-50%, -50%)';
+        }
+
+        // Focus textarea
+        textarea.focus();
+      }
+
+      function closeCodeEditor() {
+        document.getElementById( 'code-editor-window' ).style.display = 'none';
+        currentCodeFrame = null;
+        currentCodeLayerIndex = null;
+        isEditingCode = false;
+        isEditingSVG = false;
+        currentEditingElementId = null;
+      }
+
+      function setupCodeEditor() {
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        const saveBtn = document.getElementById( 'code-editor-save' );
+        const closeBtn = document.getElementById( 'code-editor-close' );
+
+        // Save button
+        saveBtn.onclick = () => {
+          if ( isEditingSVG ) {
+            saveSVGCode();
+          } else {
+            if ( currentCodeFrame === null || currentCodeLayerIndex === null ) return;
+
+            const code = textarea.value; // Don't trim, preserve formatting
+            const layer = State.layers[ currentCodeLayerIndex ];
+
+            // Save code to frame
+            if ( layer.frames[ currentCodeFrame ] ) {
+              History.saveState();
+              layer.frames[ currentCodeFrame ].code = code;
+              // Redraw timeline to update code indicator
+              drawTimeline();
+            }
+          }
+          closeCodeEditor();
+        };
+
+        // Close button
+        closeBtn.onclick = closeCodeEditor;
+
+        // Track focus for editing state
+        textarea.addEventListener( 'focus', () => { isEditingCode = true; } );
+        textarea.addEventListener( 'blur', () => {
+          // Small delay to allow clicking buttons
+          setTimeout( () => {
+            if ( document.getElementById( 'code-editor-window' ).style.display === 'none' ) {
+              isEditingCode = false;
+            }
+          }, 100 );
+        } );
+      }
+
+      function showSVGCodeEditor( element ) {
+        currentEditingElementId = element.dataset.id;
+        isEditingSVG = true;
+        isEditingCode = false; // Ensure frame code editor is off
+
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        textarea.value = element.outerHTML;
+
+        const win = document.getElementById( 'code-editor-window' );
+        win.querySelector( '.window-header' ).textContent = 'SVG Editor';
+        win.style.display = 'flex';
+
+        if ( win.style.left === '' ) {
+          // Center on first show
+          win.style.left = '50%';
+          win.style.top = '50%';
+          win.style.transform = 'translate(-50%, -50%)';
+        }
+
+        // Reset frame script context just in case
+        currentCodeFrame = null;
+        currentCodeLayerIndex = null;
+
+        // Focus textarea
+        textarea.focus();
+      }
+
+      function saveSVGCode() {
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        const newCode = textarea.value;
+
+        // Parse new code
+        const tempDiv = document.createElement( 'div' );
+        tempDiv.innerHTML = newCode;
+        const newEl = tempDiv.firstElementChild;
+
+        if ( !newEl ) return; // Invalid code
+
+        // Find element in State
+        const { layerIndex, frameIndex, elementIndex } = findElementInState( currentEditingElementId );
+
+        if ( layerIndex !== -1 ) {
+          const stateEl = State.layers[ layerIndex ].frames[ frameIndex ].elements[ elementIndex ];
+
+          History.saveState();
+
+          // Update State
+          stateEl.type = newEl.tagName.toLowerCase(); // Ensure lowercase for SVG
+          stateEl.attrs = {};
+          for ( const attr of newEl.attributes ) {
+            stateEl.attrs[ attr.name ] = attr.value;
+          }
+
+          // Re-render
+          renderStage();
+        }
+      }
+
+      function findElementInState( id ) {
+        for ( let l = 0; l < State.layers.length; l++ ) {
+          const layer = State.layers[ l ];
+          let activeFrame = null;
+          let activeFrameNum = -1;
+
+          // Find active keyframe for this layer
+          for ( let f = State.currentFrame; f >= 1; f-- ) {
+            if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+              activeFrame = layer.frames[ f ];
+              activeFrameNum = f;
+              break;
+            }
+            if ( layer.frames[ f ] && layer.frames[ f ].type === 'empty' ) break;
+          }
+
+          if ( activeFrame && activeFrame.elements ) {
+            const idx = activeFrame.elements.findIndex( e => e.id === id );
+            if ( idx !== -1 ) {
+              return { layerIndex: l, frameIndex: activeFrameNum, elementIndex: idx };
+            }
+          }
+        }
+        return { layerIndex: -1 };
+      }
+
+      // Shared scope for frame code - allows variables to persist across frames
+      // We use window as the scope so 'a = 5' works naturally
+
+      function executeFrameCode( frame ) {
+        // Execute code from all layers for this frame
+        State.layers.forEach( ( layer, layerIndex ) => {
+          const frameData = layer.frames[ frame ];
+          if ( frameData && frameData.code && frameData.code.trim() !== '' ) {
+            try {
+              // Inject beep function bound to this layer
+              const beep = ( note ) => AudioEngine.playTone( layerIndex, note );
+
+              // Inject playSound function
+              const playSound = ( url ) => AudioEngine.playSound( url );
+
+              // Execute in global scope
+              // We pass the API functions as arguments, but variables will be global
+              const codeFunction = new Function( 'play', 'stop', 'goto', 'gotoAndStop', 'beep', 'playSound',
+                frameData.code );
+              codeFunction( play, stop, goto, gotoAndStop, beep, playSound );
+            } catch ( error ) {
+              console.error( `Error executing code on frame ${ frame }, layer ${ layerIndex } (${ layer.name }):`, error );
+            }
+          }
+        } );
+      }
+
+      // --- Playback ---
+      let isPlaying = false;
+      let playInterval = null;
+
+      // Global timeline action functions (accessible from frame code)
+      function play() {
+        if ( isPlaying ) return;
+
+        AudioEngine.init();
+        AudioEngine.resume();
+
+        isPlaying = true;
+
+        // Execute code for the current frame immediately (so frame 1 works)
+        checkAudioStops( State.currentFrame );
+        executeFrameCode( State.currentFrame );
+
+        playInterval = setInterval( () => {
+          // Move to next frame
+          if ( State.currentFrame < State.totalFrames ) {
+            State.currentFrame++;
+          } else {
+            State.currentFrame = 1; // Loop
+          }
+
+          // Check for audio stops BEFORE executing new code
+          checkAudioStops( State.currentFrame );
+
+          // Execute code for the frame we just entered
+          executeFrameCode( State.currentFrame );
+
+          // Update Audio Transitions
+          updateAudioTransitions( State.currentFrame );
+
+          // Render
+          drawTimeline();
+          renderStage();
+        }, 1000 / 60 ); // 60 FPS
+      }
+
+      function checkAudioStops( frame ) {
+        State.layers.forEach( ( layer, index ) => {
+          const frameData = layer.frames[ frame ];
+          // Stop audio if the current frame is NOT a simple extension frame ('frame')
+          // This means it's either a keyframe (new content/code) or empty (silence)
+          if ( !frameData || frameData.type !== 'frame' ) {
+            AudioEngine.stopTone( index );
+          }
+        } );
+      }
+
+      const BEEP_REGEX = /beep\s*\(\s*(\d+)\s*\)/;
+
+      function updateAudioTransitions( currentFrame ) {
+        State.layers.forEach( ( layer, layerIndex ) => {
+          // 1. Find the active keyframe (start of potential transition)
+          let startFrame = null;
+          let startFrameNum = -1;
+
+          for ( let f = currentFrame; f >= 1; f-- ) {
+            if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+              startFrame = layer.frames[ f ];
+              startFrameNum = f;
+              break;
+            }
+            if ( layer.frames[ f ] && layer.frames[ f ].type === 'empty' ) break;
+          }
+
+          if ( !startFrame ) return;
+
+          // 2. Check if we are in a transition
+          let isTweening = false;
+          let endFrame = null;
+          let endFrameNum = -1;
+
+          if ( ( layer.frames[ currentFrame ] && layer.frames[ currentFrame ].isTransition ) ||
+            ( startFrame.isTransition ) ) {
+
+            // Find next keyframe
+            for ( let f = startFrameNum + 1; f <= State.totalFrames; f++ ) {
+              if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+                endFrame = layer.frames[ f ];
+                endFrameNum = f;
+                break;
+              }
+            }
+
+            if ( endFrame && currentFrame < endFrameNum ) {
+              isTweening = true;
+            }
+          }
+
+          // 3. Interpolate Frequency
+          if ( isTweening && startFrame.code && endFrame.code ) {
+            const startMatch = startFrame.code.match( BEEP_REGEX );
+            const endMatch = endFrame.code.match( BEEP_REGEX );
+
+            if ( startMatch && endMatch ) {
+              const startNote = parseInt( startMatch[ 1 ] );
+              const endNote = parseInt( endMatch[ 1 ] );
+
+              const totalDuration = endFrameNum - startFrameNum;
+              const currentProgress = currentFrame - startFrameNum;
+              let t = currentProgress / totalDuration; // 0 to 1
+              t = easeInOutQuad( t ); // Apply easing
+
+              const currentNote = startNote + ( endNote - startNote ) * t;
+              const freq = 440 * Math.pow( 2, ( currentNote - 69 ) / 12 );
+
+              AudioEngine.setFrequency( layerIndex, freq );
+            }
+          }
+        } );
+      }
+
+      function stop() {
+        isPlaying = false;
+        clearInterval( playInterval );
+        AudioEngine.stopAll();
+        State.currentFrame = 1;
+        drawTimeline();
+        renderStage();
+      }
+
+      function goto( frame ) {
+        if ( frame < 1 || frame > State.totalFrames ) {
+          console.warn( `Frame ${ frame } is out of range (1-${ State.totalFrames })` );
+          return;
+        }
+        State.currentFrame = frame;
+        drawTimeline();
+        renderStage();
+
+        if ( isPlaying ) {
+          // Fix: Execute code immediately because the loop will increment next tick
+          checkAudioStops( frame );
+          executeFrameCode( frame );
+        } else {
+          play(); // play() handles immediate execution
+        }
+      }
+
+      function gotoAndStop( frame ) {
+        if ( frame < 1 || frame > State.totalFrames ) {
+          console.warn( `Frame ${ frame } is out of range (1-${ State.totalFrames })` );
+          return;
+        }
+        pause(); // Stop if playing
+        State.currentFrame = frame;
+        drawTimeline();
+        renderStage();
+      }
+
+      function pause() {
+        isPlaying = false;
+        clearInterval( playInterval );
+        AudioEngine.stopAll();
+      }
+
+      function togglePlay() {
+        if ( isPlaying ) {
+          pause();
+        } else {
+          play();
+        }
+      }
+
+      function interpolateColor( c1, c2, t ) {
+        if ( c1 === 'none' || c2 === 'none' ) return 'none';
+        const parse = ( c ) => {
+          if ( c.startsWith( '#' ) ) {
+            let hex = c.slice( 1 );
+            if ( hex.length === 3 ) hex = hex.split( '' ).map( x => x + x ).join( '' );
+            const v = parseInt( hex, 16 );
+            return [ ( v >> 16 ) & 255, ( v >> 8 ) & 255, v & 255 ];
+          }
+          return [ 0, 0, 0 ];
+        };
+        const rgb1 = parse( c1 );
+        const rgb2 = parse( c2 );
+        const rgb = rgb1.map( ( v, i ) => Math.round( v + ( rgb2[ i ] - v ) * t ) );
+        return `rgb(${ rgb.join( ',' ) })`;
+      }
+      function easeInOutQuad( t ) {
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow( -2 * t + 2, 2 ) / 2;
+      }
+
+      function interpolateTransform( t1, t2, t ) {
+        // Handle identity transforms (empty strings)
+        if ( !t1 && !t2 ) return ''; // Both identity
+
+        if ( !t1 ) {
+          // t1 is identity, need to interpolate from identity to t2
+          // Extract the transform type from t2 and create identity version
+          const match = t2.match( /^(\w+)\s*\(/ );
+          if ( match ) {
+            const transformType = match[ 1 ];
+            if ( transformType === 'rotate' ) {
+              // Extract numbers from t2
+              const nums = t2.match( /-?\d*\.?\d+/g );
+              if ( nums && nums.length >= 1 ) {
+                // rotate(0, cx, cy) or just rotate(0)
+                const identity = nums.length === 3 ? `rotate(0, ${ nums[ 1 ] }, ${ nums[ 2 ] })` : 'rotate(0)';
+                t1 = identity;
+              } else {
+                t1 = 'rotate(0)';
+              }
+            } else if ( transformType === 'translate' ) {
+              t1 = 'translate(0, 0)';
+            } else if ( transformType === 'scale' ) {
+              t1 = 'scale(1, 1)';
+            } else {
+              // Unknown type, discrete step
+              return t < 0.5 ? '' : t2;
+            }
+          } else {
+            return t < 0.5 ? '' : t2;
+          }
+        }
+
+        if ( !t2 ) {
+          // t2 is identity, need to interpolate from t1 to identity
+          const match = t1.match( /^(\w+)\s*\(/ );
+          if ( match ) {
+            const transformType = match[ 1 ];
+            if ( transformType === 'rotate' ) {
+              const nums = t1.match( /-?\d*\.?\d+/g );
+              if ( nums && nums.length >= 1 ) {
+                const identity = nums.length === 3 ? `rotate(0, ${ nums[ 1 ] }, ${ nums[ 2 ] })` : 'rotate(0)';
+                t2 = identity;
+              } else {
+                t2 = 'rotate(0)';
+              }
+            } else if ( transformType === 'translate' ) {
+              t2 = 'translate(0, 0)';
+            } else if ( transformType === 'scale' ) {
+              t2 = 'scale(1, 1)';
+            } else {
+              return t < 0.5 ? t1 : '';
+            }
+          } else {
+            return t < 0.5 ? t1 : '';
+          }
+        }
+
+        // Extract numbers
+        const nums1 = t1.match( /-?\d*\.?\d+/g );
+        const nums2 = t2.match( /-?\d*\.?\d+/g );
+
+        if ( !nums1 || !nums2 || nums1.length !== nums2.length ) {
+          // Structure mismatch, discrete step
+          return t < 0.5 ? t1 : t2;
+        }
+
+        // Reconstruct string with interpolated numbers
+        let i = 0;
+        return t1.replace( /-?\d*\.?\d+/g, ( match ) => {
+          const n1 = parseFloat( match );
+          const n2 = parseFloat( nums2[ i++ ] );
+          const val = n1 + ( n2 - n1 ) * t;
+          // Format to avoid excessive decimals
+          return Math.round( val * 1000 ) / 1000;
+        } );
+      }
+
+      function renderStage() {
+        const drawingLayer = document.getElementById( 'drawing-layer' );
+        drawingLayer.innerHTML = ''; // Clear current
+
+        // Render all layers for current frame
+        for ( let i = State.layers.length - 1; i >= 0; i-- ) {
+          const layer = State.layers[ i ];
+
+          // Only render if current frame position has actual frame data
+          const currentFrameData = layer.frames[ State.currentFrame ];
+
+          // If no frame data at current position, don't render anything
+          if ( !currentFrameData ) {
+            continue;
+          }
+
+          // If explicitly marked as empty, don't render
+          if ( currentFrameData.type === 'empty' ) {
+            continue;
+          }
+
+          // Find active keyframe (start of sequence)
+          let activeFrame = null;
+          let startFrameNum = -1;
+
+          for ( let f = State.currentFrame; f >= 1; f-- ) {
+            if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+              activeFrame = layer.frames[ f ];
+              startFrameNum = f;
+              break;
+            }
+            if ( layer.frames[ f ] && layer.frames[ f ].type === 'empty' ) {
+              break;
+            }
+          }
+
+          if ( activeFrame && activeFrame.elements ) {
+            // Check for Transition
+            let isTweening = false;
+            let endFrame = null;
+            let endFrameNum = -1;
+
+            // Check if we are in a transition sequence
+            // We check if the current frame is marked as a transition OR if the start keyframe is marked.
+            // This handles cases where the user selects the span but not the start keyframe.
+            if ( ( layer.frames[ State.currentFrame ] && layer.frames[ State.currentFrame ].isTransition ) ||
+              ( layer.frames[ startFrameNum ] && layer.frames[ startFrameNum ].isTransition ) ) {
+              // Find next keyframe
+              for ( let f = startFrameNum + 1; f <= State.totalFrames; f++ ) {
+                if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+                  endFrame = layer.frames[ f ];
+                  endFrameNum = f;
+                  break;
+                }
+                // If we hit a non-transition frame (and not a keyframe), maybe break?
+                // For now assume contiguous transition frames.
+              }
+
+              if ( endFrame && State.currentFrame < endFrameNum ) {
+                isTweening = true;
+              }
+            }
+
+            if ( isTweening ) {
+              // Interpolate
+              const totalDuration = endFrameNum - startFrameNum;
+              const currentProgress = State.currentFrame - startFrameNum;
+              let t = currentProgress / totalDuration; // 0 to 1
+              t = easeInOutQuad( t ); // Apply easing
+
+              activeFrame.elements.forEach( ( startEl, index ) => {
+                // Try to find matching element in end frame
+                // Ideally match by ID, but for now index or ID if available
+                let endEl = endFrame.elements.find( e => e.id === startEl.id );
+                if ( !endEl ) endEl = endFrame.elements[ index ]; // Fallback to index
+
+                let attrs = { ...startEl.attrs };
+                let type = startEl.type;
+
+                if ( endEl && endEl.type === startEl.type ) {
+                  // Collect all attribute keys from both elements
+                  const allKeys = new Set( [ ...Object.keys( startEl.attrs ), ...Object.keys( endEl.attrs ) ] );
+
+                  // Interpolate all attributes
+                  allKeys.forEach( key => {
+                    const v1 = startEl.attrs[ key ];
+                    const v2 = endEl.attrs[ key ];
+
+                    // Handle cases where attribute exists in only one element
+                    if ( v1 === undefined && v2 !== undefined ) {
+                      // Attribute only in end element
+                      if ( key === 'transform' ) {
+                        // Interpolate from identity (no transform) to v2
+                        attrs[ key ] = interpolateTransform( '', v2, t );
+                      } else {
+                        // Just use end value (could interpolate from 0 for numeric)
+                        attrs[ key ] = v2;
+                      }
+                      return;
+                    }
+
+                    if ( v2 === undefined ) {
+                      // Attribute only in start element
+                      if ( key === 'transform' ) {
+                        // Interpolate from v1 to identity
+                        attrs[ key ] = interpolateTransform( v1, '', t );
+                      } else {
+                        attrs[ key ] = v1;
+                      }
+                      return;
+                    }
+
+                    // Both attributes exist, interpolate normally
+                    if ( key === 'fill' || key === 'stroke' ) {
+                      attrs[ key ] = interpolateColor( v1, v2, t );
+                    } else if ( key === 'points' ) {
+                      // Interpolate points for polyline/polygon
+                      const points1 = v1.trim().split( /\s+/ ).map( p => p.split( ',' ).map( parseFloat ) );
+                      const points2 = v2.trim().split( /\s+/ ).map( p => p.split( ',' ).map( parseFloat ) );
+
+                      const interpolatedPoints = points1.map( ( p1, i ) => {
+                        const p2 = points2[ i ] || p1; // Fallback if mismatch
+                        const x = p1[ 0 ] + ( p2[ 0 ] - p1[ 0 ] ) * t;
+                        const y = p1[ 1 ] + ( p2[ 1 ] - p1[ 1 ] ) * t;
+                        return `${ x },${ y }`;
+                      } );
+                      attrs[ key ] = interpolatedPoints.join( ' ' );
+                    } else if ( key === 'transform' ) {
+                      attrs[ key ] = interpolateTransform( v1, v2, t );
+                    } else {
+                      const n1 = parseFloat( v1 );
+                      const n2 = parseFloat( v2 );
+                      if ( !isNaN( n1 ) && !isNaN( n2 ) ) {
+                        attrs[ key ] = n1 + ( n2 - n1 ) * t;
+                      } else {
+                        attrs[ key ] = v1;
+                      }
+                    }
+                  } );
+                }
+
+                const el = document.createElementNS( 'http://www.w3.org/2000/svg', type );
+                for ( const [ key, value ] of Object.entries( attrs ) ) {
+                  el.setAttribute( key, value );
+                }
+                el.dataset.id = startEl.id;
+                drawingLayer.appendChild( el );
+              } );
+
+            } else {
+              // Normal Render
+              activeFrame.elements.forEach( elData => {
+                const el = document.createElementNS( 'http://www.w3.org/2000/svg', elData.type );
+                for ( const [ key, value ] of Object.entries( elData.attrs ) ) {
+                  el.setAttribute( key, value );
+                }
+                el.dataset.id = elData.id;
+
+                // Highlight if selected
+                if ( State.selectedElementIds.has( elData.id ) ) {
+                  el.setAttribute( 'stroke', '#0099ff' );
+                  // Ensure stroke width is visible if none
+                  if ( !el.getAttribute( 'stroke-width' ) ) {
+                    el.setAttribute( 'stroke-width', 1 );
+                  }
+                }
+
+                drawingLayer.appendChild( el );
+              } );
+            }
+          }
+        }
+      }
+
+      function setupStage() {
+        const stageContainer = document.getElementById( 'stage-container' );
+        const svg = document.getElementById( 'main-svg' );
+
+        let isDrawing = false;
+        let currentShape = null;
+        let startPos = { x: 0, y: 0 };
+
+        // Selection State
+        let isDragging = false;
+        let dragOffsets = {}; // Map ID -> {x, y} (offset from mouse)
+
+        // Helper to get SVG coordinates
+        const getSvgPoint = ( clientX, clientY ) => {
+          const pt = svg.createSVGPoint();
+          pt.x = clientX;
+          pt.y = clientY;
+          return pt.matrixTransform( svg.getScreenCTM().inverse() );
+        };
+
+        stageContainer.addEventListener( 'mousedown', ( e ) => {
+          if ( e.button !== 0 ) return; // Only left click
+          if ( State.activeTool === 'hand' || e.target.closest( '#toolbar' ) ) return; // Handled elsewhere
+
+          const pt = getSvgPoint( e.clientX, e.clientY );
+
+          if ( State.activeTool === 'square' ) {
+            isDrawing = true;
+            startPos = { x: pt.x, y: pt.y };
+
+            // Create temp shape
+            currentShape = document.createElementNS( 'http://www.w3.org/2000/svg', 'rect' );
+            currentShape.setAttribute( 'x', pt.x );
+            currentShape.setAttribute( 'y', pt.y );
+            currentShape.setAttribute( 'width', 0 );
+            currentShape.setAttribute( 'height', 0 );
+            currentShape.setAttribute( 'fill', '#ffcc00' ); // Default fill
+            currentShape.setAttribute( 'stroke', '#000' );
+            currentShape.setAttribute( 'stroke-width', 5 );
+            currentShape.setAttribute( 'rx', 10 );
+            currentShape.setAttribute( 'ry', 10 );
+            document.getElementById( 'drawing-layer' ).appendChild( currentShape );
+          } else if ( State.activeTool === 'brush' ) {
+            isDrawing = true;
+            startPos = pt;
+            currentPoints = [ pt ];
+
+            // Create temp polyline
+            currentShape = document.createElementNS( 'http://www.w3.org/2000/svg', 'polyline' );
+            currentShape.setAttribute( 'points', `${ pt.x },${ pt.y }` );
+            currentShape.setAttribute( 'fill', 'none' );
+            currentShape.setAttribute( 'stroke', '#000' );
+            currentShape.setAttribute( 'stroke-width', 5 );
+            currentShape.setAttribute( 'stroke-linecap', 'round' );
+            currentShape.setAttribute( 'stroke-linejoin', 'round' );
+            document.getElementById( 'drawing-layer' ).appendChild( currentShape );
+          } else if ( State.activeTool === 'selection' ) {
+            if ( e.target.tagName !== 'svg' && e.target.id !== 'drawing-layer' ) { // Hit element
+              const id = e.target.dataset.id;
+              if ( id ) {
+                if ( State.selectedElementIds.has( id ) ) {
+                  State.selectedElementIds.delete( id );
+                } else {
+                  State.selectedElementIds.add( id );
+                }
+                renderStage();
+              }
+            } else {
+              // Deselect all
+              State.selectedElementIds.clear();
+              renderStage();
+            }
+          } else if ( State.activeTool === 'drag' ) {
+            if ( State.selectedElementIds.size > 0 ) {
+              isDragging = true;
+              dragOffsets = {};
+
+              // Calculate offsets for ALL selected elements
+              State.selectedElementIds.forEach( id => {
+                const el = document.querySelector( `[data-id="${ id }"]` );
+                if ( el ) {
+                  const bbox = el.getBBox();
+                  // We need the element's position attributes, not just bbox
+                  // But for dragging relative to mouse, we just need current pos - mouse pos
+                  // Actually, let's just store the offset of the mouse from the element's origin (x,y)
+                  // But SVG elements might not have x,y (like polyline). 
+                  // For rect: x, y. For polyline: points.
+                  // Let's simplify: We will update the attributes relative to the mouse delta.
+                  // So we just need the start mouse position.
+                  // Wait, the previous logic used dragOffset.
+
+                  // Let's store the initial attributes of the element
+                  // And the start mouse position is 'pt'
+
+                  // Actually, better: Store the offset of the element's "anchor" from the mouse.
+                  // For rect: x,y. 
+                  // For polyline: we need to shift all points.
+
+                  // Let's use the 'startPos' (mouse down pos) and calculate delta on move.
+                  // So we need to store the ORIGINAL attributes of all selected elements on mousedown.
+                }
+              } );
+
+              startPos = pt; // Mouse down position
+
+              // Store initial state of all selected elements
+              // We need to look them up in the DOM or State? DOM is easier for current values.
+              dragOffsets = {}; // We'll use this to store initial attributes
+
+              State.selectedElementIds.forEach( id => {
+                const el = document.querySelector( `[data-id="${ id }"]` );
+                if ( el ) {
+                  if ( el.tagName === 'rect' ) {
+                    dragOffsets[ id ] = {
+                      type: 'rect',
+                      x: parseFloat( el.getAttribute( 'x' ) ),
+                      y: parseFloat( el.getAttribute( 'y' ) )
+                    };
+                  } else if ( el.tagName === 'polyline' ) {
+                    // Parse points
+                    const points = el.getAttribute( 'points' ).split( ' ' ).map( p => {
+                      const [ x, y ] = p.split( ',' ).map( parseFloat );
+                      return { x, y };
+                    } );
+                    dragOffsets[ id ] = {
+                      type: 'polyline',
+                      points: points
+                    };
+                  }
+                }
+              } );
+            }
+          }
+        } );
+
+        window.addEventListener( 'mousemove', ( e ) => {
+          if ( isDrawing && currentShape ) {
+            const pt = getSvgPoint( e.clientX, e.clientY );
+
+            if ( State.activeTool === 'square' ) {
+              const w = pt.x - startPos.x;
+              const h = pt.y - startPos.y;
+
+              currentShape.setAttribute( 'x', w < 0 ? pt.x : startPos.x );
+              currentShape.setAttribute( 'y', h < 0 ? pt.y : startPos.y );
+              currentShape.setAttribute( 'width', Math.abs( w ) );
+              currentShape.setAttribute( 'height', Math.abs( h ) );
+            } else if ( State.activeTool === 'brush' ) {
+              currentPoints.push( pt );
+              const pointsStr = currentPoints.map( p => `${ p.x },${ p.y }` ).join( ' ' );
+              currentShape.setAttribute( 'points', pointsStr );
+            }
+          } else if ( isDragging && State.activeTool === 'drag' ) {
+            const pt = getSvgPoint( e.clientX, e.clientY );
+            const dx = pt.x - startPos.x;
+            const dy = pt.y - startPos.y;
+
+            State.selectedElementIds.forEach( id => {
+              const initial = dragOffsets[ id ];
+              const el = document.querySelector( `[data-id="${ id }"]` );
+              if ( el && initial ) {
+                if ( initial.type === 'rect' ) {
+                  el.setAttribute( 'x', initial.x + dx );
+                  el.setAttribute( 'y', initial.y + dy );
+                } else if ( initial.type === 'polyline' ) {
+                  const newPoints = initial.points.map( p => `${ p.x + dx },${ p.y + dy }` ).join( ' ' );
+                  el.setAttribute( 'points', newPoints );
+                }
+              }
+            } );
+          }
+        } );
+
+        window.addEventListener( 'mouseup', () => {
+          if ( isDrawing && currentShape ) {
+            // Save to State
+            const layer = State.layers[ State.activeLayerIndex ];
+            // Find active keyframe
+            let activeFrameIndex = State.currentFrame;
+            // Walk back to find keyframe if we are on a normal frame?
+            // Flash behavior: if on a normal frame, modifying it adds a keyframe?
+            // Or modifies the previous keyframe?
+            // Usually modifies the previous keyframe content.
+
+            let keyframeIndex = -1;
+            for ( let f = State.currentFrame; f >= 1; f-- ) {
+              if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+                keyframeIndex = f;
+                break;
+              }
+            }
+
+            if ( keyframeIndex !== -1 ) {
+              History.saveState();
+
+              let newEl = null;
+
+              if ( State.activeTool === 'square' ) {
+                newEl = {
+                  id: Date.now().toString(),
+                  type: 'rect',
+                  attrs: {
+                    x: currentShape.getAttribute( 'x' ),
+                    y: currentShape.getAttribute( 'y' ),
+                    width: currentShape.getAttribute( 'width' ),
+                    height: currentShape.getAttribute( 'height' ),
+                    fill: currentShape.getAttribute( 'fill' ),
+                    stroke: currentShape.getAttribute( 'stroke' ),
+                    'stroke-width': currentShape.getAttribute( 'stroke-width' ),
+                    rx: currentShape.getAttribute( 'rx' ),
+                    ry: currentShape.getAttribute( 'ry' )
+                  }
+                };
+              } else if ( State.activeTool === 'brush' ) {
+                newEl = {
+                  id: Date.now().toString(),
+                  type: 'polyline',
+                  attrs: {
+                    points: currentShape.getAttribute( 'points' ),
+                    fill: currentShape.getAttribute( 'fill' ),
+                    stroke: currentShape.getAttribute( 'stroke' ),
+                    'stroke-width': currentShape.getAttribute( 'stroke-width' ),
+                    'stroke-linecap': currentShape.getAttribute( 'stroke-linecap' ),
+                    'stroke-linejoin': currentShape.getAttribute( 'stroke-linejoin' )
+                  }
+                };
+              }
+
+              if ( newEl ) {
+                layer.frames[ keyframeIndex ].elements.push( newEl );
+              }
+            }
+
+            isDrawing = false;
+            currentShape = null;
+            renderStage(); // Re-render to ensure state consistency
+          } else if ( isDragging && State.activeTool === 'drag' ) {
+            // Save new positions to State
+            const layer = State.layers[ State.activeLayerIndex ];
+
+            // Find keyframe
+            let keyframeIndex = -1;
+            for ( let f = State.currentFrame; f >= 1; f-- ) {
+              if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+                keyframeIndex = f;
+                break;
+              }
+            }
+
+            if ( keyframeIndex !== -1 ) {
+              History.saveState();
+              const frame = layer.frames[ keyframeIndex ];
+
+              State.selectedElementIds.forEach( id => {
+                const elData = frame.elements.find( el => el.id === id );
+                if ( elData ) {
+                  const elDOM = document.querySelector( `[data-id="${ id }"]` );
+                  if ( elDOM ) {
+                    if ( elData.type === 'rect' ) {
+                      elData.attrs.x = elDOM.getAttribute( 'x' );
+                      elData.attrs.y = elDOM.getAttribute( 'y' );
+                    } else if ( elData.type === 'polyline' ) {
+                      elData.attrs.points = elDOM.getAttribute( 'points' );
+                    }
+                  }
+                }
+              } );
+            }
+
+            isDragging = false;
+            dragOffsets = {};
+            renderStage(); // Ensure consistency
+          }
+        } );
+      }
+
+      function updateStageTransform() {
+        const stage = document.getElementById( 'stage-content' );
+        stage.style.transform = `translate(${ State.pan.x }px, ${ State.pan.y }px) scale(${ State.zoom })`;
+      }
+
+      // --- Global Keyboard Handling ---
+      function handleGlobalKeydown( e ) {
+        if ( isEditingCode || isEditingSVG ) return; // Don't trigger shortcuts while editing code or SVG
+
+        if ( e.code === 'Space' ) {
+          e.preventDefault(); // Prevent scrolling
+          if ( !e.repeat ) { // Only trigger once per key press
+            if ( isPlaying ) pause();
+            else play();
+          }
+        } else if ( e.key === 'v' || e.key === 'V' ) {
+          setTimelineMode( 'select' );
+          setTool( 'selection' );
+        } else if ( e.key === 'd' || e.key === 'D' ) {
+          setTool( 'drag' );
+        } else if ( e.key === 'h' || e.key === 'H' ) {
+          setTimelineMode( 'drag' );
+        } else if ( e.key === 'r' || e.key === 'R' ) {
+          setTool( 'square' );
+        } else if ( e.key === 'b' || e.key === 'B' ) {
+          setTool( 'brush' );
+        }
+      }
+
+      function setupInteractions() {
+        const stageContainer = document.getElementById( 'stage-container' );
+
+        // Keyboard shortcuts
+        window.addEventListener( 'keydown', handleGlobalKeydown );
+
+        // Zoom (Ctrl + Wheel) and Pan (Wheel)
+        stageContainer.addEventListener( 'wheel', ( e ) => {
+          e.preventDefault();
+
+          if ( e.ctrlKey ) {
+            // Zoom
+            const zoomIntensity = 0.02; // Slower for trackpad pinch
+            const direction = e.deltaY > 0 ? -1 : 1;
+            const factor = 1 + ( direction * zoomIntensity );
+
+            const rect = stageContainer.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let newZoom = State.zoom * factor;
+            newZoom = Math.max( 0.1, Math.min( newZoom, 10 ) );
+
+            State.pan.x = mouseX - ( mouseX - State.pan.x ) * ( newZoom / State.zoom );
+            State.pan.y = mouseY - ( mouseY - State.pan.y ) * ( newZoom / State.zoom );
+            State.zoom = newZoom;
+          } else {
+            // Pan
+            State.pan.x -= e.deltaX;
+            State.pan.y -= e.deltaY;
+          }
+
+          updateStageTransform();
+        }, { passive: false } );
+
+        // Pan (Middle Click or Space + Drag)
+        let isPanning = false;
+        let isSpacePressed = false;
+        let lastMouse = { x: 0, y: 0 };
+
+        stageContainer.addEventListener( 'mousedown', ( e ) => {
+          if ( e.button === 1 || ( e.button === 0 && ( State.activeTool === 'hand' || isSpacePressed ) ) ) { // Middle click or Hand tool (if we had one, or Space)
+            isPanning = true;
+            lastMouse = { x: e.clientX, y: e.clientY };
+            stageContainer.style.cursor = 'grabbing';
+            e.preventDefault();
+          }
+        } );
+
+        window.addEventListener( 'mousemove', ( e ) => {
+          if ( isPanning ) {
+            const dx = e.clientX - lastMouse.x;
+            const dy = e.clientY - lastMouse.y;
+            State.pan.x += dx;
+            State.pan.y += dy;
+            lastMouse = { x: e.clientX, y: e.clientY };
+            updateStageTransform();
+          }
+        } );
+
+        window.addEventListener( 'mouseup', () => {
+          if ( isPanning ) {
+            isPanning = false;
+            stageContainer.style.cursor = isSpacePressed ? 'grab' : 'default';
+          }
+        } );
+
+        // Spacebar for temporary panning
+        window.addEventListener( 'keydown', ( e ) => {
+          if ( e.code === 'Space' ) {
+            // Don't toggle play if user is editing code
+            if ( !isEditingCode && !isEditingSVG ) {
+              isSpacePressed = true;
+              stageContainer.style.cursor = 'grab';
+            }
+            // Prevent default scroll behavior
+            if ( e.target.tagName !== 'TEXTAREA' ) {
+              e.preventDefault();
+            }
+          }
+        } );
+        window.addEventListener( 'keyup', ( e ) => {
+          if ( e.code === 'Space' ) {
+            isSpacePressed = false;
+            if ( !isPanning ) stageContainer.style.cursor = 'default';
+          }
+        } );
+
+        // Context Menu for SVG Elements
+        stageContainer.addEventListener( 'contextmenu', ( e ) => {
+          e.preventDefault();
+          // Check if clicked on an SVG element (not the svg root or stage)
+          // We look for elements with dataset.id
+          let target = e.target;
+          while ( target && target !== stageContainer ) {
+            if ( target.dataset && target.dataset.id ) {
+              // Found an element
+              const menu = document.getElementById( 'context-menu' );
+              menu.innerHTML = '';
+
+              const item = document.createElement( 'div' );
+              item.className = 'menu-item';
+              item.textContent = 'Show SVG code';
+              item.onclick = () => {
+                showSVGCodeEditor( target );
+                menu.style.display = 'none';
+              };
+
+              menu.appendChild( item );
+              menu.style.display = 'block';
+              menu.style.left = e.pageX + 'px';
+              menu.style.top = e.pageY + 'px';
+              return;
+            }
+            target = target.parentNode;
+          }
+
+          // If we reached here, we didn't click on a valid element
+          const menu = document.getElementById( 'context-menu' );
+          if ( menu ) menu.style.display = 'none';
+        } );
+      }
+
+      function exportSVG() {
+        // Simple SMIL based export
+        const width = 800; // Default export size? Or infinite? Let's say 800x600 for now or bounding box.
+        const height = 600;
+        const fps = 12;
+        const durationPerFrame = 1 / fps;
+
+        let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${ width }" height="${ height }" viewBox="0 0 ${ width } ${ height }">\n`;
+
+        // We need to flatten layers? Or keep them?
+        // For simplicity, let's just export the active layer's frames.
+        // A real export would merge layers.
+
+        State.layers.forEach( ( layer, layerIndex ) => {
+          // Iterate frames
+          // We need to know which keyframe is active for each frame time
+
+          // Collect unique keyframes and their durations
+          // This is a bit complex for a simple export.
+          // Let's just iterate 1 to totalFrames and create a group for each frame that is visible for 1/fps seconds.
+          // Optimization: Group consecutive identical frames?
+
+          for ( let f = 1; f <= State.totalFrames; f++ ) {
+            // Find content for this frame
+            let activeFrame = null;
+            for ( let k = f; k >= 1; k-- ) {
+              if ( layer.frames[ k ] && layer.frames[ k ].type === 'keyframe' ) {
+                activeFrame = layer.frames[ k ];
+                break;
+              }
+              if ( layer.frames[ k ] && layer.frames[ k ].type === 'empty' ) break;
+            }
+
+            if ( activeFrame && activeFrame.elements.length > 0 ) {
+              const beginTime = ( f - 1 ) * durationPerFrame;
+
+              svgContent += `  <g display="none">\n`;
+              svgContent += `    <set attributeName="display" to="inline" begin="${ beginTime }s" dur="${ durationPerFrame }s" />\n`;
+
+              activeFrame.elements.forEach( elData => {
+                let attrs = '';
+                for ( const [ k, v ] of Object.entries( elData.attrs ) ) {
+                  attrs += ` ${ k }="${ v }"`;
+                }
+                svgContent += `    <${ elData.type }${ attrs } />\n`;
+              } );
+
+              svgContent += `  </g>\n`;
+            }
+          }
+        } );
+
+        svgContent += `</svg>`;
+
+        // Download
+        const blob = new Blob( [ svgContent ], { type: 'image/svg+xml' } );
+        const url = URL.createObjectURL( blob );
+        const a = document.createElement( 'a' );
+        a.href = url;
+        a.download = 'animation.svg';
+        document.body.appendChild( a );
+        a.click();
+        document.body.removeChild( a );
+        URL.revokeObjectURL( url );
+      }
+
+      function saveProject() {
+        // Select only the data we need to save
+        const projectData = {
+          layers: State.layers,
+          totalFrames: State.totalFrames,
+          currentFrame: State.currentFrame
+        };
+
+        // Create a blob and trigger download
+        const blob = new Blob( [ JSON.stringify( projectData, null, 2 ) ], { type: 'application/json' } );
+        const url = URL.createObjectURL( blob );
+        const a = document.createElement( 'a' );
+        a.href = url;
+        a.download = 'project.json';
+        document.body.appendChild( a );
+        a.click();
+        document.body.removeChild( a );
+        URL.revokeObjectURL( url );
+        console.log( "Project saved as project.json" );
+      }
+
+      function loadProject() {
+        const input = document.createElement( 'input' );
+        input.type = 'file';
+        input.accept = '.json';
+
+        input.onchange = e => {
+          const file = e.target.files[ 0 ];
+          if ( !file ) return;
+
+          const reader = new FileReader();
+
+          reader.onload = event => {
+            try {
+              const data = JSON.parse( event.target.result );
+
+              // Validate data structure roughly
+              if ( !data.layers || !Array.isArray( data.layers ) ) {
+                alert( 'Invalid project file' );
+                return;
+              }
+
+              History.saveState(); // Save current state before loading
+
+              // Restore state
+              State.layers = data.layers;
+              State.totalFrames = data.totalFrames || 100;
+              State.currentFrame = data.currentFrame || 1;
+
+              // Re-render everything
+              renderTimeline();
+              drawTimeline();
+              renderStage();
+
+              console.log( 'Project loaded successfully!' );
+            } catch ( err ) {
+              console.error( 'Error loading project:', err );
+              alert( 'Error loading project. See console for details.' );
+            }
+          };
+
+          reader.readAsText( file );
+        };
+
+        input.click();
+      }
+
+      // --- Timeline Popup ---
+      function openTimelinePopup() {
+        if ( timelineWindow && !timelineWindow.closed ) {
+          timelineWindow.focus();
+          return;
+        }
+
+        // 1. Open new window
+        timelineWindow = window.open( '', 'Timeline', 'width=800,height=300' );
+        if ( !timelineWindow ) {
+          alert( 'Popup blocked! Please allow popups for this site.' );
+          return;
+        }
+
+        // 2. Copy Styles
+        const styles = document.querySelectorAll( 'style' );
+        styles.forEach( style => {
+          timelineWindow.document.head.appendChild( style.cloneNode( true ) );
+        } );
+
+        // Add specific styles for popup body to ensure full height
+        const popupStyle = timelineWindow.document.createElement( 'style' );
+        popupStyle.textContent = `
+          body { margin: 0; padding: 0; overflow: hidden; background: #f5f5f5; }
+          #timeline-body { height: 100vh; display: flex; flex-direction: column; }
+          #timeline-grid-container { flex: 1; overflow: auto; background: #fff; }
+          .menu-item { padding: 4px 10px; color: #333; cursor: pointer; }
+          .menu-item:hover { background: #eee; }
+        `;
+        timelineWindow.document.head.appendChild( popupStyle );
+
+        // 3. Move DOM
+        // Move the wrapper which includes controls and body
+        const timelineWrapper = document.getElementById( 'timeline-content-wrapper' );
+        timelineContainer = timelineWrapper.parentElement; // Save original parent (#timeline-window)
+
+        // We move the wrapper content to the new window
+        timelineWindow.document.body.appendChild( timelineWrapper );
+
+        // Hide the original window content or show placeholder
+        timelineContainer.style.display = 'none';
+        document.getElementById( 'timeline-window' ).style.display = 'none'; // Hide the window frame
+
+        // 4. Re-bind Events
+        setupTimelineInteractions();
+
+        // Bind Keyboard Events in Popup
+        timelineWindow.addEventListener( 'keydown', handleGlobalKeydown );
+
+        // Fix Stuck Dragging: Bind mouseup to BOTH windows
+        // When dragging in popup and releasing in main (or vice versa), we need to stop.
+        const stopDrag = () => {
+          if ( isScrubbing ) isScrubbing = false;
+          if ( isSelecting ) isSelecting = false;
+          if ( isDraggingFrame ) isDraggingFrame = false;
+
+          // Reset cursor
+          if ( timelineWindow && !timelineWindow.closed ) {
+            const canvas = timelineWindow.document.getElementById( 'timeline-canvas' );
+            if ( canvas ) canvas.style.cursor = 'default';
+          }
+          // The main canvas element itself is moved to the popup, so document.getElementById('timeline-canvas')
+          // in the main window context would return null after the move.
+          // The original canvas element's cursor will be reset when mouseup fires on it in the popup.
+        };
+
+        window.addEventListener( 'mouseup', stopDrag );
+        timelineWindow.addEventListener( 'mouseup', stopDrag );
+
+        // 5. Handle Close
+        timelineWindow.addEventListener( 'beforeunload', () => {
+          // Restore DOM
+          if ( timelineContainer && timelineWrapper ) {
+            timelineContainer.appendChild( timelineWrapper );
+            timelineContainer.style.display = 'block';
+            document.getElementById( 'timeline-window' ).style.display = 'flex';
+          }
+
+          // Remove listeners? (Browser handles cleanup on close, but main window listener persists)
+          window.removeEventListener( 'mouseup', stopDrag );
+
+          timelineWindow = null;
+
+          // Re-bind events to main window
+          setTimeout( () => {
+            setupTimelineInteractions();
+            drawTimeline();
+          }, 0 );
+        } );
+
+        // Initial draw in new window
+        drawTimeline();
+      }
+
+      // --- Code Editor Tabs & AI ---
+      function setupCodeEditor() {
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        const saveBtn = document.getElementById( 'code-editor-save' );
+        const closeBtn = document.getElementById( 'code-editor-close' );
+        const askBtn = document.getElementById( 'code-editor-ask' );
+
+        // Tab Buttons
+        const tabCode = document.getElementById( 'tab-code' );
+        const tabTalk = document.getElementById( 'tab-talk' );
+        const contentCode = document.getElementById( 'tab-content-code' );
+        const contentTalk = document.getElementById( 'tab-content-talk' );
+
+        const switchTab = ( tab ) => {
+          if ( tab === 'code' ) {
+            tabCode.className = 'active';
+            tabCode.style.background = '#fff';
+            tabCode.style.borderBottom = 'none';
+
+            tabTalk.className = '';
+            tabTalk.style.background = 'transparent';
+            tabTalk.style.borderBottom = '1px solid #ddd';
+
+            contentCode.style.display = 'flex';
+            contentTalk.style.display = 'none';
+
+            saveBtn.style.display = 'inline-block';
+            askBtn.style.display = 'none';
+          } else {
+            tabTalk.className = 'active';
+            tabTalk.style.background = '#fff';
+            tabTalk.style.border = '1px solid #ddd';
+            tabTalk.style.borderBottom = 'none';
+
+            tabCode.className = '';
+            tabCode.style.background = 'transparent';
+            tabCode.style.border = 'none';
+
+            contentCode.style.display = 'none';
+            contentTalk.style.display = 'flex';
+
+            saveBtn.style.display = 'none';
+            askBtn.style.display = 'inline-block';
+
+            document.getElementById( 'talk-textarea' ).focus();
+          }
+        };
+
+        tabCode.onclick = () => switchTab( 'code' );
+        tabTalk.onclick = () => switchTab( 'talk' );
+
+        // Ask Button Logic
+        askBtn.onclick = async () => {
+          const talkTextarea = document.getElementById( 'talk-textarea' );
+          const prompt = talkTextarea.value.trim();
+          const status = document.getElementById( 'talk-status' );
+
+          if ( !prompt ) return;
+
+          status.textContent = 'Thinking...';
+          askBtn.disabled = true;
+
+          try {
+            // Get current code from the textarea (user might have edited it)
+            const currentCode = textarea.value;
+
+            // Check context: SVG editing or Frame code editing
+            if ( isEditingSVG ) {
+              // Generate SVG code
+              await callGemmaForElement( prompt, currentCode );
+              // Apply changes immediately
+              saveSVGCode();
+            } else {
+              // Generate JavaScript frame code
+              await callGemmaForFrameCode( prompt, currentCode );
+            }
+
+            status.textContent = 'Applied!';
+            talkTextarea.value = ''; // Clear input
+
+            setTimeout( () => {
+              status.textContent = '';
+            }, 2000 );
+          } catch ( e ) {
+            console.error( e );
+            status.textContent = 'Error: ' + e.message;
+          } finally {
+            askBtn.disabled = false;
+          }
+        };
+
+        // Save button
+        saveBtn.onclick = () => {
+          if ( isEditingSVG ) {
+            saveSVGCode();
+          } else {
+            if ( currentCodeFrame === null || currentCodeLayerIndex === null ) return;
+
+            const code = textarea.value; // Don't trim, preserve formatting
+            const layer = State.layers[ currentCodeLayerIndex ];
+
+            // Save code to frame
+            if ( layer.frames[ currentCodeFrame ] ) {
+              History.saveState();
+              layer.frames[ currentCodeFrame ].code = code;
+              // Redraw timeline to update code indicator
+              drawTimeline();
+            }
+          }
+          closeCodeEditor();
+        };
+
+        // Close button
+        closeBtn.onclick = closeCodeEditor;
+
+        // Track focus for editing state
+        textarea.addEventListener( 'focus', () => { isEditingCode = true; } );
+        textarea.addEventListener( 'blur', () => {
+          // Small delay to allow clicking buttons
+          setTimeout( () => {
+            if ( document.getElementById( 'code-editor-window' ).style.display === 'none' ) {
+              isEditingCode = false;
+            }
+          }, 100 );
+        } );
+      }
+
+      async function callGemmaForElement( userPrompt, currentSvgCode ) {
+        // 1. Construct Prompt
+        const systemPrompt = `You are an SVG expert. You will receive an SVG element code snippet and a user request to modify it.
+        You must return ONLY the modified SVG element code. Do not include markdown formatting, backticks, or explanations. Just the raw SVG code.
+        `;
+
+        const fullPrompt = `
+        Current SVG Element:
+        ${ currentSvgCode }
+        
+        User Request: ${ userPrompt }
+        
+        Return the modified SVG element code:
+        `;
+
+        // 2. Call API
+        const apiKey = 'AIzaSyAXYEHwYzVPVA6Nuei50GNKJU1k9EZY4aA'; //OH NO! Try hack me :)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key=${ apiKey }`;
+
+        const response = await fetch( url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify( {
+            contents: [ {
+              parts: [ { text: systemPrompt + "\n" + fullPrompt } ]
+            } ]
+          } )
+        } );
+
+        if ( !response.ok ) {
+          const err = await response.text();
+          throw new Error( `API Error: ${ response.status } ${ err }` );
+        }
+
+        const data = await response.json();
+        const generatedText = data.candidates[ 0 ].content.parts[ 0 ].text;
+
+        // 3. Clean up and Update
+        let newCode = generatedText.trim();
+        if ( newCode.startsWith( '```xml' ) ) {
+          newCode = newCode.replace( /^```xml/, '' ).replace( /```$/, '' );
+        } else if ( newCode.startsWith( '```svg' ) ) {
+          newCode = newCode.replace( /^```svg/, '' ).replace( /```$/, '' );
+        } else if ( newCode.startsWith( '```html' ) ) {
+          newCode = newCode.replace( /^```html/, '' ).replace( /```$/, '' );
+        } else if ( newCode.startsWith( '```' ) ) {
+          newCode = newCode.replace( /^```/, '' ).replace( /```$/, '' );
+        }
+
+        // Update the textarea
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        textarea.value = newCode.trim();
+      }
+
+      async function callGemmaForFrameCode( userPrompt, currentCode ) {
+        // 1. Construct Prompt for JavaScript
+        const systemPrompt = `You are a JavaScript expert. You will receive JavaScript code and a user request to modify it.
+        You must return ONLY the modified JavaScript code. Do not include markdown formatting, backticks, or explanations. Just the raw JavaScript code.
+        The code runs in a Flash-like animation environment with these available functions:
+        - play() - starts playback
+        - stop() - stops playback
+        - goto(frame) - jumps to a frame
+        - gotoAndStop(frame) - jumps to a frame and stops
+        - beep(midiNote) - plays a musical note
+        - playSound(url) - plays an audio file from a URL
+        `;
+
+        const fullPrompt = `
+        Current JavaScript Code:
+        ${ currentCode }
+        
+        User Request: ${ userPrompt }
+        
+        Return the modified JavaScript code:
+        `;
+
+        // 2. Call API
+        const apiKey = 'AIzaSyAXYEHwYzVPVA6Nuei50GNKJU1k9EZY4aA'; //OH NO! Try hack me :)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key=${ apiKey }`;
+
+        const response = await fetch( url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify( {
+            contents: [ {
+              parts: [ { text: systemPrompt + "\n" + fullPrompt } ]
+            } ]
+          } )
+        } );
+
+        if ( !response.ok ) {
+          const err = await response.text();
+          throw new Error( `API Error: ${ response.status } ${ err }` );
+        }
+
+        const data = await response.json();
+        const generatedText = data.candidates[ 0 ].content.parts[ 0 ].text;
+
+        // 3. Clean up and Update
+        let newCode = generatedText.trim();
+        if ( newCode.startsWith( '```javascript' ) ) {
+          newCode = newCode.replace( /^```javascript/, '' ).replace( /```$/, '' );
+        } else if ( newCode.startsWith( '```js' ) ) {
+          newCode = newCode.replace( /^```js/, '' ).replace( /```$/, '' );
+        } else if ( newCode.startsWith( '```' ) ) {
+          newCode = newCode.replace( /^```/, '' ).replace( /```$/, '' );
+        }
+
+        // Update the textarea
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        textarea.value = newCode.trim();
+      }
+
+      function showSVGCodeEditor( element ) {
+        currentEditingElementId = element.dataset.id;
+        isEditingSVG = true;
+        isEditingCode = false; // Ensure frame code editor is off
+
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        textarea.value = element.outerHTML;
+
+        const win = document.getElementById( 'code-editor-window' );
+        win.querySelector( '.window-header' ).textContent = 'SVG Editor';
+
+        // Show Tabs
+        document.getElementById( 'editor-tabs' ).style.display = 'flex';
+        // Reset to Code tab
+        document.getElementById( 'tab-code' ).click();
+
+        // Set SVG-specific helper text and placeholder
+        document.getElementById( 'talk-helper-text' ).textContent = 'Describe how you want to modify this element.';
+        document.getElementById( 'talk-textarea' ).placeholder = "e.g., 'Change color to blue' or 'Rotate 45 degrees'";
+
+        win.style.display = 'flex';
+
+        if ( win.style.left === '' ) {
+          // Center on first show
+          win.style.left = '50%';
+          win.style.top = '50%';
+          win.style.transform = 'translate(-50%, -50%)';
+        }
+
+        // Reset frame script context just in case
+        currentCodeFrame = null;
+        currentCodeLayerIndex = null;
+
+        // Focus textarea
+        textarea.focus();
+      }
+
+      function showCodeEditor( frame, layerIndex ) {
+        currentCodeFrame = frame;
+        currentCodeLayerIndex = layerIndex;
+        isEditingCode = true;
+
+        const editorWindow = document.getElementById( 'code-editor-window' );
+        const textarea = document.getElementById( 'code-editor-textarea' );
+        const header = editorWindow.querySelector( '.window-header' );
+
+        // Update header
+        header.textContent = `Frame ${ frame } Code (Layer ${ State.layers[ layerIndex ].name })`;
+
+        // Show Tabs (for frame code too)
+        document.getElementById( 'editor-tabs' ).style.display = 'flex';
+        // Reset to Code tab
+        document.getElementById( 'tab-code' ).click();
+
+        // Set JavaScript-specific helper text and placeholder
+        document.getElementById( 'talk-helper-text' ).textContent = 'Describe what you want to happen on this frame (e.g., "play a sound", "go to frame 10").';
+        document.getElementById( 'talk-textarea' ).placeholder = "e.g., 'Play a beep sound' or 'Stop playback and go to frame 1'";
+
+        // Load existing code or empty
+        const layer = State.layers[ layerIndex ];
+        // Ensure frame exists
+        if ( !layer.frames[ frame ] ) {
+          // Auto-create frame if it doesn't exist
+          layer.frames[ frame ] = { type: 'frame' };
+        }
+
+        const frameData = layer.frames[ frame ];
+        textarea.value = frameData.code || '';
+
+        // Show and position window
+        editorWindow.style.display = 'flex';
+        if ( editorWindow.style.left === '' ) {
+          // Center on first show
+          editorWindow.style.left = '50%';
+          editorWindow.style.top = '50%';
+          editorWindow.style.transform = 'translate(-50%, -50%)';
+        }
+
+        // Focus textarea
+        textarea.focus();
+      }
+
+      // Initial Render
+      init();
+    </script>
+  </body>
+
+</html>
