@@ -880,7 +880,11 @@
         { id: 'selection', icon: 'Select', label: 'Selection Tool (V)' },
         { id: 'drag', icon: 'Drag', label: 'Drag Tool (D)' },
         { id: 'square', icon: 'Rect', label: 'Rectangle Tool (R)' },
+        { id: 'circle', icon: 'Circle', label: 'Circle Tool (C)' },
+        { id: 'line', icon: 'Line', label: 'Line Tool (L)' },
         { id: 'brush', icon: 'Brush', label: 'Brush Tool (B)' },
+        { id: 'text', icon: 'Text', label: 'Text Tool (T)' },
+        { id: 'import', icon: 'Import', label: 'Import SVG (I)' },
         { id: 'save', icon: 'Save', label: 'Save Project' },
         { id: 'open', icon: 'Open', label: 'Open Project' },
         { id: 'export', icon: 'Export', label: 'Export SVG' }
@@ -901,6 +905,8 @@
               saveProject();
             } else if ( tool.id === 'open' ) {
               loadProject();
+            } else if ( tool.id === 'import' ) {
+              importSVG();
             } else {
               setTool( tool.id );
             }
@@ -2232,6 +2238,11 @@
                   }
                 }
 
+                // Handle text content for text elements
+                if ( elData.type === 'text' && elData.textContent ) {
+                  el.textContent = elData.textContent;
+                }
+
                 drawingLayer.appendChild( el );
               } );
             }
@@ -2295,6 +2306,67 @@
             currentShape.setAttribute( 'stroke-linecap', 'round' );
             currentShape.setAttribute( 'stroke-linejoin', 'round' );
             document.getElementById( 'drawing-layer' ).appendChild( currentShape );
+          } else if ( State.activeTool === 'circle' ) {
+            isDrawing = true;
+            startPos = { x: pt.x, y: pt.y };
+
+            // Create temp circle
+            currentShape = document.createElementNS( 'http://www.w3.org/2000/svg', 'circle' );
+            currentShape.setAttribute( 'cx', pt.x );
+            currentShape.setAttribute( 'cy', pt.y );
+            currentShape.setAttribute( 'r', 0 );
+            currentShape.setAttribute( 'fill', '#4CAF50' ); // Default green fill
+            currentShape.setAttribute( 'stroke', '#000' );
+            currentShape.setAttribute( 'stroke-width', 5 );
+            document.getElementById( 'drawing-layer' ).appendChild( currentShape );
+          } else if ( State.activeTool === 'line' ) {
+            isDrawing = true;
+            startPos = { x: pt.x, y: pt.y };
+
+            // Create temp line
+            currentShape = document.createElementNS( 'http://www.w3.org/2000/svg', 'line' );
+            currentShape.setAttribute( 'x1', pt.x );
+            currentShape.setAttribute( 'y1', pt.y );
+            currentShape.setAttribute( 'x2', pt.x );
+            currentShape.setAttribute( 'y2', pt.y );
+            currentShape.setAttribute( 'stroke', '#000' );
+            currentShape.setAttribute( 'stroke-width', 5 );
+            currentShape.setAttribute( 'stroke-linecap', 'round' );
+            document.getElementById( 'drawing-layer' ).appendChild( currentShape );
+          } else if ( State.activeTool === 'text' ) {
+            // Prompt for text input
+            const userText = prompt( 'Enter text:' );
+            if ( userText && userText.trim() ) {
+              // Find current keyframe
+              const layer = State.layers[ State.activeLayerIndex ];
+              let keyframeIndex = -1;
+              for ( let f = State.currentFrame; f >= 1; f-- ) {
+                if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+                  keyframeIndex = f;
+                  break;
+                }
+              }
+
+              if ( keyframeIndex !== -1 ) {
+                History.saveState();
+
+                const newEl = {
+                  id: Date.now().toString(),
+                  type: 'text',
+                  attrs: {
+                    x: pt.x,
+                    y: pt.y,
+                    fill: '#000',
+                    'font-size': '24',
+                    'font-family': 'Arial, sans-serif'
+                  },
+                  textContent: userText.trim()
+                };
+
+                layer.frames[ keyframeIndex ].elements.push( newEl );
+                renderStage();
+              }
+            }
           } else if ( State.activeTool === 'selection' ) {
             if ( e.target.tagName !== 'svg' && e.target.id !== 'drawing-layer' ) { // Hit element
               const id = e.target.dataset.id;
@@ -2357,15 +2429,56 @@
                       x: parseFloat( el.getAttribute( 'x' ) ),
                       y: parseFloat( el.getAttribute( 'y' ) )
                     };
-                  } else if ( el.tagName === 'polyline' ) {
+                  } else if ( el.tagName === 'circle' ) {
+                    dragOffsets[ id ] = {
+                      type: 'circle',
+                      cx: parseFloat( el.getAttribute( 'cx' ) ),
+                      cy: parseFloat( el.getAttribute( 'cy' ) )
+                    };
+                  } else if ( el.tagName === 'ellipse' ) {
+                    dragOffsets[ id ] = {
+                      type: 'ellipse',
+                      cx: parseFloat( el.getAttribute( 'cx' ) ),
+                      cy: parseFloat( el.getAttribute( 'cy' ) )
+                    };
+                  } else if ( el.tagName === 'line' ) {
+                    dragOffsets[ id ] = {
+                      type: 'line',
+                      x1: parseFloat( el.getAttribute( 'x1' ) ),
+                      y1: parseFloat( el.getAttribute( 'y1' ) ),
+                      x2: parseFloat( el.getAttribute( 'x2' ) ),
+                      y2: parseFloat( el.getAttribute( 'y2' ) )
+                    };
+                  } else if ( el.tagName === 'text' ) {
+                    dragOffsets[ id ] = {
+                      type: 'text',
+                      x: parseFloat( el.getAttribute( 'x' ) ),
+                      y: parseFloat( el.getAttribute( 'y' ) )
+                    };
+                  } else if ( el.tagName === 'polyline' || el.tagName === 'polygon' ) {
                     // Parse points
                     const points = el.getAttribute( 'points' ).split( ' ' ).map( p => {
                       const [ x, y ] = p.split( ',' ).map( parseFloat );
                       return { x, y };
                     } );
                     dragOffsets[ id ] = {
-                      type: 'polyline',
+                      type: el.tagName,
                       points: points
+                    };
+                  } else if ( el.tagName === 'path' ) {
+                    // For path, we'll need to parse and transform the d attribute
+                    // For now, store the path data and apply transform
+                    dragOffsets[ id ] = {
+                      type: 'path',
+                      d: el.getAttribute( 'd' ),
+                      // Store current transform if any
+                      transform: el.getAttribute( 'transform' ) || ''
+                    };
+                  } else {
+                    // Generic fallback for other types - use transform
+                    dragOffsets[ id ] = {
+                      type: 'generic',
+                      transform: el.getAttribute( 'transform' ) || ''
                     };
                   }
                 }
@@ -2390,6 +2503,16 @@
               currentPoints.push( pt );
               const pointsStr = currentPoints.map( p => `${ p.x },${ p.y }` ).join( ' ' );
               currentShape.setAttribute( 'points', pointsStr );
+            } else if ( State.activeTool === 'circle' ) {
+              // Calculate radius from distance to center
+              const dx = pt.x - startPos.x;
+              const dy = pt.y - startPos.y;
+              const radius = Math.sqrt( dx * dx + dy * dy );
+              currentShape.setAttribute( 'r', radius );
+            } else if ( State.activeTool === 'line' ) {
+              // Update end point
+              currentShape.setAttribute( 'x2', pt.x );
+              currentShape.setAttribute( 'y2', pt.y );
             }
           } else if ( isDragging && State.activeTool === 'drag' ) {
             const pt = getSvgPoint( e.clientX, e.clientY );
@@ -2403,9 +2526,29 @@
                 if ( initial.type === 'rect' ) {
                   el.setAttribute( 'x', initial.x + dx );
                   el.setAttribute( 'y', initial.y + dy );
-                } else if ( initial.type === 'polyline' ) {
+                } else if ( initial.type === 'circle' ) {
+                  el.setAttribute( 'cx', initial.cx + dx );
+                  el.setAttribute( 'cy', initial.cy + dy );
+                } else if ( initial.type === 'ellipse' ) {
+                  el.setAttribute( 'cx', initial.cx + dx );
+                  el.setAttribute( 'cy', initial.cy + dy );
+                } else if ( initial.type === 'line' ) {
+                  el.setAttribute( 'x1', initial.x1 + dx );
+                  el.setAttribute( 'y1', initial.y1 + dy );
+                  el.setAttribute( 'x2', initial.x2 + dx );
+                  el.setAttribute( 'y2', initial.y2 + dy );
+                } else if ( initial.type === 'text' ) {
+                  el.setAttribute( 'x', initial.x + dx );
+                  el.setAttribute( 'y', initial.y + dy );
+                } else if ( initial.type === 'polyline' || initial.type === 'polygon' ) {
                   const newPoints = initial.points.map( p => `${ p.x + dx },${ p.y + dy }` ).join( ' ' );
                   el.setAttribute( 'points', newPoints );
+                } else if ( initial.type === 'path' ) {
+                  // Apply transform for path elements
+                  el.setAttribute( 'transform', `translate(${ dx }, ${ dy }) ${ initial.transform }` );
+                } else if ( initial.type === 'generic' ) {
+                  // Apply transform for generic elements
+                  el.setAttribute( 'transform', `translate(${ dx }, ${ dy }) ${ initial.transform }` );
                 }
               }
             } );
@@ -2465,6 +2608,33 @@
                     'stroke-linejoin': currentShape.getAttribute( 'stroke-linejoin' )
                   }
                 };
+              } else if ( State.activeTool === 'circle' ) {
+                newEl = {
+                  id: Date.now().toString(),
+                  type: 'circle',
+                  attrs: {
+                    cx: currentShape.getAttribute( 'cx' ),
+                    cy: currentShape.getAttribute( 'cy' ),
+                    r: currentShape.getAttribute( 'r' ),
+                    fill: currentShape.getAttribute( 'fill' ),
+                    stroke: currentShape.getAttribute( 'stroke' ),
+                    'stroke-width': currentShape.getAttribute( 'stroke-width' )
+                  }
+                };
+              } else if ( State.activeTool === 'line' ) {
+                newEl = {
+                  id: Date.now().toString(),
+                  type: 'line',
+                  attrs: {
+                    x1: currentShape.getAttribute( 'x1' ),
+                    y1: currentShape.getAttribute( 'y1' ),
+                    x2: currentShape.getAttribute( 'x2' ),
+                    y2: currentShape.getAttribute( 'y2' ),
+                    stroke: currentShape.getAttribute( 'stroke' ),
+                    'stroke-width': currentShape.getAttribute( 'stroke-width' ),
+                    'stroke-linecap': currentShape.getAttribute( 'stroke-linecap' )
+                  }
+                };
               }
 
               if ( newEl ) {
@@ -2500,8 +2670,25 @@
                     if ( elData.type === 'rect' ) {
                       elData.attrs.x = elDOM.getAttribute( 'x' );
                       elData.attrs.y = elDOM.getAttribute( 'y' );
-                    } else if ( elData.type === 'polyline' ) {
+                    } else if ( elData.type === 'circle' ) {
+                      elData.attrs.cx = elDOM.getAttribute( 'cx' );
+                      elData.attrs.cy = elDOM.getAttribute( 'cy' );
+                    } else if ( elData.type === 'ellipse' ) {
+                      elData.attrs.cx = elDOM.getAttribute( 'cx' );
+                      elData.attrs.cy = elDOM.getAttribute( 'cy' );
+                    } else if ( elData.type === 'line' ) {
+                      elData.attrs.x1 = elDOM.getAttribute( 'x1' );
+                      elData.attrs.y1 = elDOM.getAttribute( 'y1' );
+                      elData.attrs.x2 = elDOM.getAttribute( 'x2' );
+                      elData.attrs.y2 = elDOM.getAttribute( 'y2' );
+                    } else if ( elData.type === 'text' ) {
+                      elData.attrs.x = elDOM.getAttribute( 'x' );
+                      elData.attrs.y = elDOM.getAttribute( 'y' );
+                    } else if ( elData.type === 'polyline' || elData.type === 'polygon' ) {
                       elData.attrs.points = elDOM.getAttribute( 'points' );
+                    } else if ( elData.type === 'path' || elDOM.hasAttribute( 'transform' ) ) {
+                      // Save the transform attribute
+                      elData.attrs.transform = elDOM.getAttribute( 'transform' );
                     }
                   }
                 }
@@ -2541,6 +2728,14 @@
           setTool( 'square' );
         } else if ( e.key === 'b' || e.key === 'B' ) {
           setTool( 'brush' );
+        } else if ( e.key === 'c' || e.key === 'C' ) {
+          setTool( 'circle' );
+        } else if ( e.key === 'l' || e.key === 'L' ) {
+          setTool( 'line' );
+        } else if ( e.key === 't' || e.key === 'T' ) {
+          setTool( 'text' );
+        } else if ( e.key === 'i' || e.key === 'I' ) {
+          importSVG();
         }
       }
 
@@ -2799,6 +2994,100 @@
 
         input.click();
       }
+
+      // --- Import SVG ---
+      function importSVG() {
+        const input = document.createElement( 'input' );
+        input.type = 'file';
+        input.accept = '.svg,image/svg+xml';
+
+        input.onchange = ( e ) => {
+          const file = e.target.files[ 0 ];
+          if ( !file ) return;
+
+          const reader = new FileReader();
+
+          reader.onload = ( evt ) => {
+            try {
+              const svgText = evt.target.result;
+
+              // Parse SVG
+              const parser = new DOMParser();
+              const doc = parser.parseFromString( svgText, 'image/svg+xml' );
+              const svgElement = doc.querySelector( 'svg' );
+
+              if ( !svgElement ) {
+                alert( 'Invalid SVG file' );
+                return;
+              }
+
+              // Find current keyframe
+              const layer = State.layers[ State.activeLayerIndex ];
+              let keyframeIndex = -1;
+              for ( let f = State.currentFrame; f >= 1; f-- ) {
+                if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+                  keyframeIndex = f;
+                  break;
+                }
+              }
+
+              if ( keyframeIndex === -1 ) {
+                // Create keyframe if none exists
+                layer.frames[ State.currentFrame ] = { type: 'keyframe', elements: [] };
+                keyframeIndex = State.currentFrame;
+              }
+
+              History.saveState();
+
+              // Extract elements from SVG
+              const children = Array.from( svgElement.children );
+              let importCount = 0;
+
+              children.forEach( child => {
+                // Skip non-visual elements
+                if ( child.tagName === 'defs' || child.tagName === 'style' || child.tagName === 'script' ) {
+                  return;
+                }
+
+                // Convert element to our format
+                const attrs = {};
+                for ( let i = 0; i < child.attributes.length; i++ ) {
+                  const attr = child.attributes[ i ];
+                  attrs[ attr.name ] = attr.value;
+                }
+
+                const newEl = {
+                  id: Date.now().toString() + '_' + importCount,
+                  type: child.tagName,
+                  attrs: attrs
+                };
+
+                // Handle text content
+                if ( child.tagName === 'text' && child.textContent ) {
+                  newEl.textContent = child.textContent.trim();
+                }
+
+                layer.frames[ keyframeIndex ].elements.push( newEl );
+                importCount++;
+              } );
+
+              renderStage();
+              drawTimeline();
+
+              console.log( `Imported ${ importCount } elements from SVG` );
+              alert( `Successfully imported ${ importCount } elements!` );
+            } catch ( err ) {
+              console.error( 'Error importing SVG:', err );
+              alert( 'Error importing SVG. See console for details.' );
+            }
+          };
+
+          reader.readAsText( file );
+        };
+
+        input.click();
+      }
+
 
       // --- Timeline Popup ---
       function openTimelinePopup() {
@@ -3108,9 +3397,27 @@
         document.getElementById( 'tinker-opacity' ).value = opacity;
         document.getElementById( 'tinker-opacity-val' ).textContent = opacity;
 
-        // Dimensions
-        const width = element.getAttribute( 'width' ) || element.getAttribute( 'rx' ) || '';
-        const height = element.getAttribute( 'height' ) || element.getAttribute( 'ry' ) || '';
+        // Dimensions - element-specific
+        let width = '';
+        let height = '';
+
+        if ( element.tagName === 'rect' ) {
+          width = element.getAttribute( 'width' ) || '';
+          height = element.getAttribute( 'height' ) || '';
+        } else if ( element.tagName === 'circle' ) {
+          width = element.getAttribute( 'r' ) || '';
+          height = element.getAttribute( 'r' ) || '';
+        } else if ( element.tagName === 'ellipse' ) {
+          width = element.getAttribute( 'rx' ) || '';
+          height = element.getAttribute( 'ry' ) || '';
+        } else if ( element.tagName === 'line' ) {
+          width = element.getAttribute( 'x2' ) || '';
+          height = element.getAttribute( 'y2' ) || '';
+        } else if ( element.tagName === 'text' ) {
+          width = element.getAttribute( 'x' ) || '';
+          height = element.getAttribute( 'y' ) || '';
+        }
+
         document.getElementById( 'tinker-width' ).value = width;
         document.getElementById( 'tinker-height' ).value = height;
 
@@ -3137,7 +3444,7 @@
 
         // Get values
         const rotation = document.getElementById( 'tinker-rotation' ).value;
-        const scale = document.getElementById( 'tinker-scale' ).value;
+        const scale = parseFloat( document.getElementById( 'tinker-scale' ).value );
         const opacity = document.getElementById( 'tinker-opacity' ).value;
         const width = document.getElementById( 'tinker-width' ).value;
         const height = document.getElementById( 'tinker-height' ).value;
@@ -3146,46 +3453,108 @@
         const strokeWidth = document.getElementById( 'tinker-stroke-width' ).value;
         const radius = document.getElementById( 'tinker-radius' ).value;
 
-        // Apply transform
-        let transforms = [];
-        if ( rotation && rotation != 0 ) {
-          // Get element center for rotation
-          const bbox = element.getBBox();
-          const cx = bbox.x + bbox.width / 2;
-          const cy = bbox.y + bbox.height / 2;
-          transforms.push( `rotate(${ rotation } ${ cx } ${ cy })` );
-        }
-        if ( scale && scale != 1 ) {
-          const bbox = element.getBBox();
-          const cx = bbox.x + bbox.width / 2;
-          const cy = bbox.y + bbox.height / 2;
-          transforms.push( `translate(${ cx } ${ cy }) scale(${ scale }) translate(${ -cx } ${ -cy })` );
+        // Get original dimensions (store them as data attributes if not already stored)
+        if ( !element.hasAttribute( 'data-original-stored' ) ) {
+          if ( element.tagName === 'rect' ) {
+            element.setAttribute( 'data-orig-x', element.getAttribute( 'x' ) || 0 );
+            element.setAttribute( 'data-orig-y', element.getAttribute( 'y' ) || 0 );
+            element.setAttribute( 'data-orig-width', element.getAttribute( 'width' ) || 0 );
+            element.setAttribute( 'data-orig-height', element.getAttribute( 'height' ) || 0 );
+          }
+          element.setAttribute( 'data-original-stored', 'true' );
         }
 
-        if ( transforms.length > 0 ) {
-          element.setAttribute( 'transform', transforms.join( ' ' ) );
+        // Apply scale by adjusting dimensions and position
+        if ( element.tagName === 'rect' ) {
+          const origX = parseFloat( element.getAttribute( 'data-orig-x' ) );
+          const origY = parseFloat( element.getAttribute( 'data-orig-y' ) );
+          const origW = parseFloat( element.getAttribute( 'data-orig-width' ) );
+          const origH = parseFloat( element.getAttribute( 'data-orig-height' ) );
+
+          const newW = origW * scale;
+          const newH = origH * scale;
+          const newX = origX - ( newW - origW ) / 2;
+          const newY = origY - ( newH - origH ) / 2;
+
+          element.setAttribute( 'width', newW );
+          element.setAttribute( 'height', newH );
+          element.setAttribute( 'x', newX );
+          element.setAttribute( 'y', newY );
+
+          // Update the input fields to show actual values
+          document.getElementById( 'tinker-width' ).value = Math.round( newW );
+          document.getElementById( 'tinker-height' ).value = Math.round( newH );
+        } else {
+          // For other elements, apply width/height directly from input
+          if ( element.tagName === 'circle' ) {
+            if ( width ) element.setAttribute( 'r', width );
+          } else if ( element.tagName === 'ellipse' ) {
+            if ( width ) element.setAttribute( 'rx', width );
+            if ( height ) element.setAttribute( 'ry', height );
+          } else if ( element.tagName === 'line' ) {
+            if ( width ) element.setAttribute( 'x2', width );
+            if ( height ) element.setAttribute( 'y2', height );
+          } else if ( element.tagName === 'text' ) {
+            if ( width ) element.setAttribute( 'x', width );
+            if ( height ) element.setAttribute( 'y', height );
+          }
+        }
+
+        // Calculate center for rotation
+        let cx, cy;
+        if ( element.tagName === 'rect' ) {
+          const x = parseFloat( element.getAttribute( 'x' ) ) || 0;
+          const y = parseFloat( element.getAttribute( 'y' ) ) || 0;
+          const w = parseFloat( element.getAttribute( 'width' ) ) || 0;
+          const h = parseFloat( element.getAttribute( 'height' ) ) || 0;
+          cx = x + w / 2;
+          cy = y + h / 2;
+        } else if ( element.tagName === 'ellipse' ) {
+          cx = parseFloat( element.getAttribute( 'cx' ) ) || 0;
+          cy = parseFloat( element.getAttribute( 'cy' ) ) || 0;
+        } else if ( element.tagName === 'circle' ) {
+          cx = parseFloat( element.getAttribute( 'cx' ) ) || 0;
+          cy = parseFloat( element.getAttribute( 'cy' ) ) || 0;
+        } else if ( element.tagName === 'polyline' || element.tagName === 'polygon' ) {
+          const points = element.getAttribute( 'points' ).trim().split( /\s+/ ).map( p => {
+            const [ x, y ] = p.split( ',' ).map( parseFloat );
+            return { x, y };
+          } );
+          const xs = points.map( p => p.x );
+          const ys = points.map( p => p.y );
+          const minX = Math.min( ...xs );
+          const maxX = Math.max( ...xs );
+          const minY = Math.min( ...ys );
+          const maxY = Math.max( ...ys );
+          cx = ( minX + maxX ) / 2;
+          cy = ( minY + maxY ) / 2;
+        } else if ( element.tagName === 'line' ) {
+          const x1 = parseFloat( element.getAttribute( 'x1' ) ) || 0;
+          const y1 = parseFloat( element.getAttribute( 'y1' ) ) || 0;
+          const x2 = parseFloat( element.getAttribute( 'x2' ) ) || 0;
+          const y2 = parseFloat( element.getAttribute( 'y2' ) ) || 0;
+          cx = ( x1 + x2 ) / 2;
+          cy = ( y1 + y2 ) / 2;
+        } else if ( element.tagName === 'text' ) {
+          const x = parseFloat( element.getAttribute( 'x' ) ) || 0;
+          const y = parseFloat( element.getAttribute( 'y' ) ) || 0;
+          cx = x;
+          cy = y;
+        } else {
+          const bbox = element.getBBox();
+          cx = bbox.x + bbox.width / 2;
+          cy = bbox.y + bbox.height / 2;
+        }
+
+        // Apply transform (rotation only)
+        if ( rotation && rotation != 0 ) {
+          element.setAttribute( 'transform', `rotate(${ rotation } ${ cx } ${ cy })` );
         } else {
           element.removeAttribute( 'transform' );
         }
 
         // Apply other attributes
         if ( opacity ) element.setAttribute( 'opacity', opacity );
-        if ( width ) {
-          if ( element.tagName === 'rect' ) {
-            element.setAttribute( 'width', width );
-          } else if ( element.tagName === 'ellipse' || element.tagName === 'circle' ) {
-            element.setAttribute( 'rx', width );
-          }
-        }
-        if ( height ) {
-          if ( element.tagName === 'rect' ) {
-            element.setAttribute( 'height', height );
-          } else if ( element.tagName === 'ellipse' ) {
-            element.setAttribute( 'ry', height );
-          } else if ( element.tagName === 'circle' ) {
-            element.setAttribute( 'r', height );
-          }
-        }
         if ( fill ) element.setAttribute( 'fill', fill );
         if ( stroke ) element.setAttribute( 'stroke', stroke );
         if ( strokeWidth ) element.setAttribute( 'stroke-width', strokeWidth );
