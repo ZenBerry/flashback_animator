@@ -2217,6 +2217,12 @@
                   el.setAttribute( key, value );
                 }
                 el.dataset.id = startEl.id;
+
+                // Handle text content for text elements during interpolation
+                if ( type === 'text' && startEl.textContent ) {
+                  el.textContent = startEl.textContent;
+                }
+
                 drawingLayer.appendChild( el );
               } );
 
@@ -2334,39 +2340,86 @@
             currentShape.setAttribute( 'stroke-linecap', 'round' );
             document.getElementById( 'drawing-layer' ).appendChild( currentShape );
           } else if ( State.activeTool === 'text' ) {
-            // Prompt for text input
-            const userText = prompt( 'Enter text:' );
-            if ( userText && userText.trim() ) {
-              // Find current keyframe
-              const layer = State.layers[ State.activeLayerIndex ];
-              let keyframeIndex = -1;
-              for ( let f = State.currentFrame; f >= 1; f-- ) {
-                if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
-                  keyframeIndex = f;
-                  break;
+            // Create inline editable text field (Flash 5 style)
+            const drawingLayer = document.getElementById( 'drawing-layer' );
+
+            // Create foreignObject to hold HTML input
+            const foreignObj = document.createElementNS( 'http://www.w3.org/2000/svg', 'foreignObject' );
+            foreignObj.setAttribute( 'x', pt.x );
+            foreignObj.setAttribute( 'y', pt.y - 24 ); // Offset up by font size
+            foreignObj.setAttribute( 'width', 400 );
+            foreignObj.setAttribute( 'height', 100 );
+            foreignObj.style.overflow = 'visible';
+
+            // Create contenteditable div
+            const textInput = document.createElement( 'div' );
+            textInput.contentEditable = true;
+            textInput.style.fontFamily = 'Arial, sans-serif';
+            textInput.style.fontSize = '24px';
+            textInput.style.color = '#000';
+            textInput.style.outline = '2px solid #0099ff';
+            textInput.style.padding = '2px';
+            textInput.style.minWidth = '50px';
+            textInput.style.whiteSpace = 'nowrap';
+            textInput.style.background = 'rgba(255, 255, 255, 0.9)';
+
+            foreignObj.appendChild( textInput );
+            drawingLayer.appendChild( foreignObj );
+
+            // Focus the text input
+            setTimeout( () => textInput.focus(), 0 );
+
+            // Handle text completion
+            const finishText = () => {
+              const userText = textInput.textContent.trim();
+
+              if ( userText ) {
+                // Find current keyframe
+                const layer = State.layers[ State.activeLayerIndex ];
+                let keyframeIndex = -1;
+                for ( let f = State.currentFrame; f >= 1; f-- ) {
+                  if ( layer.frames[ f ] && layer.frames[ f ].type === 'keyframe' ) {
+                    keyframeIndex = f;
+                    break;
+                  }
+                }
+
+                if ( keyframeIndex !== -1 ) {
+                  History.saveState();
+
+                  const newEl = {
+                    id: Date.now().toString(),
+                    type: 'text',
+                    attrs: {
+                      x: pt.x,
+                      y: pt.y,
+                      fill: '#000',
+                      'font-size': '24',
+                      'font-family': 'Arial, sans-serif'
+                    },
+                    textContent: userText
+                  };
+
+                  layer.frames[ keyframeIndex ].elements.push( newEl );
                 }
               }
 
-              if ( keyframeIndex !== -1 ) {
-                History.saveState();
+              // Remove the temporary input
+              drawingLayer.removeChild( foreignObj );
+              renderStage();
+            };
 
-                const newEl = {
-                  id: Date.now().toString(),
-                  type: 'text',
-                  attrs: {
-                    x: pt.x,
-                    y: pt.y,
-                    fill: '#000',
-                    'font-size': '24',
-                    'font-family': 'Arial, sans-serif'
-                  },
-                  textContent: userText.trim()
-                };
-
-                layer.frames[ keyframeIndex ].elements.push( newEl );
-                renderStage();
+            // Finish on Enter key or blur
+            textInput.addEventListener( 'keydown', ( evt ) => {
+              if ( evt.key === 'Enter' && !evt.shiftKey ) {
+                evt.preventDefault();
+                finishText();
+              } else if ( evt.key === 'Escape' ) {
+                drawingLayer.removeChild( foreignObj );
               }
-            }
+            } );
+
+            textInput.addEventListener( 'blur', finishText );
           } else if ( State.activeTool === 'selection' ) {
             if ( e.target.tagName !== 'svg' && e.target.id !== 'drawing-layer' ) { // Hit element
               const id = e.target.dataset.id;
