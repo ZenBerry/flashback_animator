@@ -408,6 +408,19 @@
               <label style="font-size: 10px;">Corner Radius</label>
               <input type="number" id="tinker-radius" min="0" step="1" style="width: 40px; font-size: 10px;">
             </div>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label style="font-size: 10px;">Font</label>
+              <select id="tinker-font" style="font-size: 10px; flex: 1; margin-left: 10px;">
+                <option value="Roboto, sans-serif">Roboto</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="Helvetica, sans-serif">Helvetica</option>
+                <option value="Times New Roman, serif">Times New Roman</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Courier New, monospace">Courier New</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="Comic Sans MS, cursive">Comic Sans MS</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -462,7 +475,8 @@
         selectedElementIds: new Set(),
         clipboard: null,
         frameClipboard: null, // For timeline frame copy/paste
-        dragState: { active: false, type: null, source: null, target: null }
+        dragState: { active: false, type: null, source: null, target: null },
+        isEditingText: false // Track when text input is active to disable hotkeys
       };
 
       // --- Event Bus ---
@@ -879,6 +893,7 @@
       const Tools = [
         { id: 'selection', icon: 'Select', label: 'Selection Tool (V)' },
         { id: 'drag', icon: 'Drag', label: 'Drag Tool (D)' },
+        { id: 'transform', icon: 'Transform', label: 'Free Transform Tool (Q)' },
         { id: 'square', icon: 'Rect', label: 'Rectangle Tool (R)' },
         { id: 'circle', icon: 'Circle', label: 'Circle Tool (C)' },
         { id: 'line', icon: 'Line', label: 'Line Tool (L)' },
@@ -2347,27 +2362,43 @@
             const foreignObj = document.createElementNS( 'http://www.w3.org/2000/svg', 'foreignObject' );
             foreignObj.setAttribute( 'x', pt.x );
             foreignObj.setAttribute( 'y', pt.y - 24 ); // Offset up by font size
-            foreignObj.setAttribute( 'width', 400 );
+            foreignObj.setAttribute( 'width', 50 ); // Start small, will auto-resize
             foreignObj.setAttribute( 'height', 100 );
             foreignObj.style.overflow = 'visible';
+            foreignObj.id = 'temp-text-input'; // Mark as temporary
 
             // Create contenteditable div
             const textInput = document.createElement( 'div' );
             textInput.contentEditable = true;
-            textInput.style.fontFamily = 'Arial, sans-serif';
+            textInput.style.fontFamily = 'Roboto, sans-serif';
             textInput.style.fontSize = '24px';
             textInput.style.color = '#000';
             textInput.style.outline = '2px solid #0099ff';
             textInput.style.padding = '2px';
-            textInput.style.minWidth = '50px';
+            textInput.style.minWidth = '20px';
             textInput.style.whiteSpace = 'nowrap';
-            textInput.style.background = 'rgba(255, 255, 255, 0.9)';
+            textInput.style.background = 'transparent';
+            textInput.style.display = 'inline-block';
 
             foreignObj.appendChild( textInput );
             drawingLayer.appendChild( foreignObj );
 
+            // Set flag to disable hotkeys
+            State.isEditingText = true;
+
+            // Auto-resize width based on content
+            const resizeWidth = () => {
+              const width = Math.max( 50, textInput.offsetWidth + 10 );
+              foreignObj.setAttribute( 'width', width );
+            };
+
+            textInput.addEventListener( 'input', resizeWidth );
+
             // Focus the text input
-            setTimeout( () => textInput.focus(), 0 );
+            setTimeout( () => {
+              textInput.focus();
+              resizeWidth();
+            }, 0 );
 
             // Handle text completion
             const finishText = () => {
@@ -2395,7 +2426,7 @@
                       y: pt.y,
                       fill: '#000',
                       'font-size': '24',
-                      'font-family': 'Arial, sans-serif'
+                      'font-family': 'Roboto, sans-serif'
                     },
                     textContent: userText
                   };
@@ -2404,8 +2435,13 @@
                 }
               }
 
+              // Clear flag to re-enable hotkeys
+              State.isEditingText = false;
+
               // Remove the temporary input
-              drawingLayer.removeChild( foreignObj );
+              if ( drawingLayer.contains( foreignObj ) ) {
+                drawingLayer.removeChild( foreignObj );
+              }
               renderStage();
             };
 
@@ -2415,7 +2451,10 @@
                 evt.preventDefault();
                 finishText();
               } else if ( evt.key === 'Escape' ) {
-                drawingLayer.removeChild( foreignObj );
+                State.isEditingText = false;
+                if ( drawingLayer.contains( foreignObj ) ) {
+                  drawingLayer.removeChild( foreignObj );
+                }
               }
             } );
 
@@ -2762,7 +2801,7 @@
 
       // --- Global Keyboard Handling ---
       function handleGlobalKeydown( e ) {
-        if ( isEditingCode || isEditingSVG ) return; // Don't trigger shortcuts while editing code or SVG
+        if ( isEditingCode || isEditingSVG || State.isEditingText ) return; // Don't trigger shortcuts while editing
 
         if ( e.code === 'Space' ) {
           e.preventDefault(); // Prevent scrolling
@@ -2775,6 +2814,8 @@
           setTool( 'selection' );
         } else if ( e.key === 'd' || e.key === 'D' ) {
           setTool( 'drag' );
+        } else if ( e.key === 'q' || e.key === 'Q' ) {
+          setTool( 'transform' );
         } else if ( e.key === 'h' || e.key === 'H' ) {
           setTimelineMode( 'drag' );
         } else if ( e.key === 'r' || e.key === 'R' ) {
@@ -3392,6 +3433,7 @@
         const strokeInput = document.getElementById( 'tinker-stroke' );
         const strokeWidthInput = document.getElementById( 'tinker-stroke-width' );
         const radiusInput = document.getElementById( 'tinker-radius' );
+        const fontInput = document.getElementById( 'tinker-font' );
 
         // Update value displays
         rotationSlider.oninput = () => {
@@ -3416,6 +3458,7 @@
         strokeInput.oninput = applyTinkerChanges;
         strokeWidthInput.oninput = applyTinkerChanges;
         radiusInput.oninput = applyTinkerChanges;
+        fontInput.onchange = applyTinkerChanges;
       }
 
       function populateTinkerControls() {
@@ -3487,6 +3530,10 @@
         // Corner radius (for rect)
         const rx = element.getAttribute( 'rx' ) || '';
         document.getElementById( 'tinker-radius' ).value = rx;
+
+        // Font family (for text)
+        const fontFamily = element.getAttribute( 'font-family' ) || 'Roboto, sans-serif';
+        document.getElementById( 'tinker-font' ).value = fontFamily;
       }
 
       function applyTinkerChanges() {
@@ -3505,6 +3552,7 @@
         const stroke = document.getElementById( 'tinker-stroke' ).value;
         const strokeWidth = document.getElementById( 'tinker-stroke-width' ).value;
         const radius = document.getElementById( 'tinker-radius' ).value;
+        const fontFamily = document.getElementById( 'tinker-font' ).value;
 
         // Get original dimensions (store them as data attributes if not already stored)
         if ( !element.hasAttribute( 'data-original-stored' ) ) {
@@ -3614,6 +3662,9 @@
         if ( radius && element.tagName === 'rect' ) {
           element.setAttribute( 'rx', radius );
           element.setAttribute( 'ry', radius );
+        }
+        if ( fontFamily && element.tagName === 'text' ) {
+          element.setAttribute( 'font-family', fontFamily );
         }
 
         // Update the code textarea to reflect changes
